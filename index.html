@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>同心守望之城 · 多日禱告園</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink1:#0B1637; --ink2:#1B2A52;
+    --parchment:#F3ECD9; --parchment-dim:#D9CFAF;
+    --gold:#C9A227; --amber:#E8A33D; --amber-bright:#F4C15C;
+    --panel-bg: rgba(21,17,12,0.94);
+    --panel-border: rgba(201,162,39,0.55);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; min-height:100%;
+    background: linear-gradient(180deg, var(--ink1), var(--ink2));
+    font-family:'Noto Sans TC', sans-serif; color:var(--parchment);
+  }
+  h1,h2,.serif{ font-family:'Noto Serif TC', serif; }
+  .wrap{ max-width:640px; margin:0 auto; padding:48px 20px 64px; text-align:center; }
+  .lantern{ font-size:44px; margin-bottom:6px; filter:drop-shadow(0 0 12px rgba(232,163,61,0.55)); }
+  h1{ margin:0 0 6px; font-size:26px; color:var(--amber-bright); text-shadow:0 1px 8px rgba(0,0,0,0.5); }
+  .tagline{ margin:0 0 28px; font-size:13px; color:var(--parchment-dim); line-height:1.7; }
+  .days{ display:flex; flex-direction:column; gap:14px; }
+  .day-card{
+    display:block; text-align:left; text-decoration:none; color:var(--parchment);
+    background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:14px;
+    padding:16px 18px; transition:transform .15s ease, border-color .15s ease;
+  }
+  .day-card:active{ transform:scale(0.98); }
+  .day-card.latest{ border-color:var(--amber-bright); box-shadow:0 0 0 1px rgba(244,193,92,0.25), 0 4px 18px rgba(0,0,0,0.35); }
+  .day-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .day-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; color:var(--amber-bright); }
+  .day-badge{
+    font-size:11px; padding:3px 9px; border-radius:999px; background:rgba(232,163,61,0.18);
+    color:var(--amber-bright); border:1px solid rgba(232,163,61,0.4); white-space:nowrap;
+  }
+  .day-desc{ margin:6px 0 0; font-size:12.5px; color:var(--parchment-dim); line-height:1.6; }
+  .foot-note{ margin-top:34px; font-size:11px; color:var(--parchment-dim); line-height:1.8; opacity:0.85; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lantern">🕯️</div>
+  <h1>同心守望之城</h1>
+  <p class="tagline">3D多人代禱園 · 每一天一座話題室<br>選一天提燈進城，與弟兄姊妹一同守望、代禱</p>
+
+  <div class="days">
+    <a class="day-card latest" href="/sep22/">
+      <div class="day-row">
+        <span class="day-title">🕊️ 9月22日．聽道而行版</span>
+        <span class="day-badge">今日 · 最新</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：路加福音8:19-21／箴言21:1</p>
+    </a>
+
+    <a class="day-card" href="/sep21/">
+      <div class="day-row">
+        <span class="day-title">🕊️ 9月21日．國際和平日／跟隨我版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：馬太福音9:9-13／約翰福音14:27</p>
+    </a>
+
+    <a class="day-card" href="/sep20/">
+      <div class="day-row">
+        <span class="day-title">🍇 9月20日．主日／葡萄園版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：馬太福音20:1-16／腓立比書1:20-24,27</p>
+    </a>
+
+    <a class="day-card" href="/sep19/">
+      <div class="day-row">
+        <span class="day-title">🛡️ 9月19日．全民國防教育日版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：希伯來書10:32-36／約翰福音12:24-26</p>
+    </a>
+
+    <a class="day-card" href="/sep18/">
+      <div class="day-row">
+        <span class="day-title">🕊️ 9月18日．九一八紀念版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：哥林多前書15:12-20／馬可福音8:1-10</p>
+    </a>
+
+    <a class="day-card" href="/sep17/">
+      <div class="day-row">
+        <span class="day-title">💛 9月17日．信望愛版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：哥林多前書15:1-11／路加福音7:36-50</p>
+    </a>
+
+    <a class="day-card" href="/sep16/">
+      <div class="day-row">
+        <span class="day-title">🕊️ 9月16日．殉道者合一版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：哥林多前書12:31-13:13／路加福音7:31-35</p>
+    </a>
+
+    <a class="day-card" href="/sep15/">
+      <div class="day-row">
+        <span class="day-title">🕯️ 9月15日．痛苦聖母版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">世界、教會、中國大陸與家庭教會的大事與紀念；華夏守望葡萄園今日經課：約翰福音19:25-27／路加福音2:33-35</p>
+    </a>
+
+    <a class="day-card" href="/sep14/">
+      <div class="day-row">
+        <span class="day-title">✝️ 9月14日．舉榮聖架版</span>
+        <span class="day-badge">歷史存檔</span>
+      </div>
+      <p class="day-desc">光榮十字聖架瞻禮／舉揚至聖賜生命的十字架；華夏守望葡萄園今日經課：民數記21章／約翰福音3:14-17／腓立比書2:6-9</p>
+    </a>
+  </div>
+
+  <p class="foot-note">
+    每一天的代禱牆、燭光與問安各自獨立、彼此不互通，像每天一間各自的禱告小屋；<br>
+    舊的日子仍保留瀏覽，方便日後回顧與代禱。<br><br>
+    園中的代禱文字只是範本，不是真正的禱告。真正的平安來自耶穌（約14:27）。
+  </p>
+</div>
+</body>
+</html>
