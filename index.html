@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>同心守望之城 · 3D多人代禱園（9月20日版）</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+  :root{
+    --ink1:#0B1637; --ink2:#1B2A52;
+    --parchment:#F3ECD9; --parchment-dim:#D9CFAF;
+    --charcoal:#211C16;
+    --gold:#C9A227; --amber:#E8A33D; --amber-bright:#F4C15C;
+    --panel-bg: rgba(21,17,12,0.94);
+    --panel-border: rgba(201,162,39,0.55);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden; position:fixed;
+    background: linear-gradient(180deg, var(--ink1), var(--ink2));
+    font-family:'Noto Sans TC', sans-serif; color:var(--parchment);
+    touch-action:none; overscroll-behavior:none;
+  }
+  h1,h2,h3,.serif{ font-family:'Noto Serif TC', serif; }
+
+  #canvas-container{ position:fixed; inset:0; touch-action:none; }
+  #canvas-container canvas{ display:block; }
+  /* Full-screen touch layer: lets the player drag/swipe anywhere to move,
+     not just the small fixed joystick circle. Sits above the 3D canvas but
+     below every real UI control (topbar, buttons, panels, modal), so taps on
+     those still reach them first. */
+  #move-layer{ position:fixed; inset:0; z-index:15; touch-action:none; }
+
+  /* ---------- Top bar ---------- */
+  #topbar{
+    position:fixed; top:0; left:0; right:0; z-index:20;
+    display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+    padding:12px 14px 34px;
+    background:linear-gradient(180deg, rgba(9,15,36,0.88), rgba(9,15,36,0));
+    pointer-events:none;
+  }
+  /* title-block must be allowed to shrink and wrap (min-width:0 overrides the
+     flex default of min-width:auto) so long titles/subtitles never push under
+     or behind the fixed-width action buttons on narrow phone screens — that
+     push-under is what previously read as "overlapping" top-bar text. */
+  #topbar .title-block{ pointer-events:none; flex:1 1 auto; min-width:0; }
+  #topbar h1{ margin:0; font-size:17px; line-height:1.35; letter-spacing:1px; color:var(--amber-bright); text-shadow:0 1px 6px rgba(0,0,0,0.5); overflow-wrap:break-word; }
+  #topbar .sub{ margin:4px 0 0; font-size:11px; line-height:1.6; color:var(--parchment-dim); overflow-wrap:break-word; }
+  #stats-corner{
+    display:inline-block; margin:7px 0 0; font-size:10px; line-height:1.65; color:var(--parchment-dim);
+    background:rgba(21,17,12,0.5); padding:3px 9px; border-radius:12px;
+    pointer-events:none; max-width:100%; overflow-wrap:break-word; white-space:normal;
+  }
+  #conn-status{
+    display:none; margin:5px 0 0; font-size:10px; line-height:1.5;
+    padding:3px 9px; border-radius:12px; pointer-events:none; max-width:100%;
+  }
+  #conn-status.online{ display:inline-block; color:#BFE3B0; background:rgba(30,60,30,0.5); }
+  #conn-status.offline{ display:inline-block; color:#E9CD7A; background:rgba(60,45,15,0.5); }
+  .topbar-actions{ pointer-events:auto; display:flex; gap:8px; flex:none; margin-left:4px; }
+  #legend-btn, #menu-btn{
+    pointer-events:auto; width:38px; height:38px; border-radius:10px;
+    background:rgba(21,17,12,0.75); border:1px solid var(--panel-border); color:var(--amber-bright);
+    font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  #legend-panel, #menu-panel{
+    position:fixed; top:56px; right:12px; z-index:21; width:222px;
+    background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:10px;
+    padding:12px 14px; font-size:12.5px; line-height:1.7; display:none; pointer-events:auto;
+  }
+  #legend-panel.show, #menu-panel.show{ display:block; }
+  #legend-panel .legend-item{ display:flex; align-items:center; gap:8px; margin:3px 0; }
+  #legend-panel .dot{ width:9px; height:9px; border-radius:50%; flex:none; box-shadow:0 0 6px currentColor; }
+  .panel-header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:-2px 0 9px; font-family:'Noto Serif TC',serif; font-weight:700;
+    font-size:13px; color:var(--amber-bright);
+  }
+  .panel-close{
+    width:22px; height:22px; border-radius:50%; flex:none;
+    border:1px solid rgba(243,236,217,0.3); background:rgba(0,0,0,0.25);
+    color:var(--parchment); font-size:13px; line-height:1; cursor:pointer;
+  }
+  .menu-item{
+    display:block; width:100%; text-align:left; padding:9px 10px; margin:5px 0;
+    border-radius:8px; border:1px solid rgba(243,236,217,0.16); background:rgba(0,0,0,0.22);
+    color:var(--parchment); font-size:12.5px; font-family:inherit; cursor:pointer;
+  }
+  .menu-item:active{ background:rgba(232,163,61,0.28); }
+
+  /* ---------- Hint banner ---------- */
+  #hint-banner{
+    position:fixed; left:50%; bottom:118px; transform:translate(-50%,10px);
+    z-index:19; padding:8px 16px; border-radius:999px;
+    background:rgba(21,17,12,0.82); border:1px solid var(--panel-border);
+    font-size:13px; color:var(--amber-bright); white-space:nowrap;
+    opacity:0; transition:opacity .25s ease, transform .25s ease; pointer-events:none;
+    max-width:88vw; overflow:hidden; text-overflow:ellipsis;
+  }
+  #hint-banner.show{ opacity:1; transform:translate(-50%,0); }
+
+  /* ---------- Joystick ---------- */
+  #stick-base{
+    position:fixed; left:22px; bottom:26px; z-index:20;
+    width:104px; height:104px; border-radius:50%;
+    background:rgba(21,17,12,0.55); border:1.5px solid rgba(243,236,217,0.35);
+    touch-action:none; opacity:0.9;
+  }
+  /* While the player is dragging from a spot other than the default corner,
+     the base jumps there instantly (no transition); on release it glides
+     back home so the resting control is always easy to find again. */
+  #stick-base.returning{ transition:left .25s ease, top .25s ease, right .25s ease, bottom .25s ease; }
+  #stick-base.floating{ box-shadow:0 0 16px rgba(232,163,61,0.35); }
+  #stick-knob{
+    position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px;
+    border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--amber-bright), var(--amber) 70%);
+    box-shadow:0 0 10px rgba(232,163,61,0.7); transition:transform .04s linear;
+  }
+
+  /* ---------- Interact button ---------- */
+  #interact-btn{
+    position:fixed; right:26px; bottom:32px; z-index:20;
+    width:74px; height:74px; border-radius:50%; border:1.5px solid rgba(243,236,217,0.3);
+    background:rgba(21,17,12,0.55); color:var(--parchment-dim); font-size:12.5px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    opacity:0.45; pointer-events:auto; transition:all .2s ease;
+  }
+  #interact-btn .ic{ font-size:20px; }
+  #interact-btn.active{
+    opacity:1; color:var(--charcoal); background:radial-gradient(circle at 35% 30%, var(--amber-bright), var(--amber));
+    box-shadow:0 0 22px rgba(232,163,61,0.85); transform:scale(1.05);
+  }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed; left:50%; top:98px; transform:translateX(-50%) translateY(-8px);
+    z-index:25; background:var(--panel-bg); border:1px solid var(--panel-border);
+    padding:10px 16px; border-radius:10px; font-size:12.5px; max-width:86vw; text-align:center;
+    opacity:0; transition:opacity .35s ease, transform .35s ease; pointer-events:none; line-height:1.6;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- Start screen ---------- */
+  #start-screen{
+    position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 30%, #1c2a52 0%, #0a1230 75%);
+    padding:20px; overflow-y:auto;
+  }
+  #start-screen.hidden{ display:none; }
+  .start-card{
+    width:100%; max-width:380px; background:var(--panel-bg); border:1px solid var(--panel-border);
+    border-radius:14px; padding:26px 22px 22px; text-align:center; margin:auto;
+  }
+  .start-card .lantern{ font-size:34px; margin-bottom:6px; }
+  .start-card h1{ font-size:22px; margin:0 0 4px; color:var(--amber-bright); }
+  .start-card .desc{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 14px; line-height:1.75; text-align:left; }
+  .start-card label{ display:block; text-align:left; font-size:12px; color:var(--parchment-dim); margin:14px 0 6px; }
+  .start-card input[type=text]{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(243,236,217,0.25);
+    background:rgba(0,0,0,0.25); color:var(--parchment); font-size:14px; font-family:inherit;
+  }
+  .avatar-row{ display:flex; gap:10px; justify-content:center; margin-top:6px; }
+  .avatar-swatch{
+    width:36px; height:36px; border-radius:50%; border:2px solid transparent; cursor:pointer;
+  }
+  .avatar-swatch.selected{ border-color:var(--parchment); box-shadow:0 0 0 2px var(--amber-bright); }
+  .primary-btn{
+    margin-top:20px; width:100%; padding:13px; border:none; border-radius:10px; cursor:pointer;
+    background:linear-gradient(180deg, var(--amber-bright), var(--amber)); color:#241a06;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px;
+  }
+  .start-note{ margin-top:14px; font-size:10.5px; color:rgba(217,207,175,0.65); line-height:1.6; text-align:left; }
+
+  /* ---------- Modal ---------- */
+  #modal-overlay{
+    position:fixed; inset:0; z-index:30; background:rgba(6,10,24,0.72);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  #modal-overlay.hidden{ display:none; }
+  #modal-card{
+    position:relative; width:100%; max-width:460px; max-height:82vh; overflow-y:auto;
+    background:var(--panel-bg); border:1px solid var(--panel-border);
+    border-radius:16px 16px 0 0; padding:22px 20px 26px;
+    -webkit-overflow-scrolling:touch;
+  }
+  @media (min-height:700px){ #modal-overlay{ align-items:center; } #modal-card{ border-radius:14px; } }
+  .modal-close{
+    position:absolute; top:10px; right:12px; width:30px; height:30px; border-radius:50%;
+    border:1px solid rgba(243,236,217,0.3); background:rgba(0,0,0,0.25); color:var(--parchment);
+    font-size:16px; cursor:pointer; line-height:1;
+  }
+  .modal-zone-tag{
+    display:inline-block; font-size:11px; padding:3px 10px; border-radius:999px; color:#1a1206; font-weight:700;
+  }
+  #modal-card h2{ font-size:18.5px; margin:10px 40px 12px 0; line-height:1.5; }
+  #modal-card .summary{ font-size:13.5px; line-height:1.85; color:var(--parchment); margin:0 0 14px; }
+  #modal-card blockquote{
+    margin:0 0 10px; padding:9px 12px; border-left:3px solid var(--gold);
+    background:rgba(201,162,39,0.08); font-family:'Noto Serif TC',serif; font-size:13px; line-height:1.75;
+  }
+  #modal-card blockquote cite{ display:block; margin-top:4px; font-size:11px; color:var(--amber-bright); font-style:normal; }
+  #modal-card .reflect{
+    font-size:13px; line-height:1.75; margin:14px 0; padding:10px 12px; border-radius:8px;
+    background:rgba(91,58,98,0.18); border:1px dashed rgba(185,138,196,0.5);
+  }
+  .ghost-btn{
+    width:100%; padding:10px; margin-top:4px; border-radius:8px; cursor:pointer;
+    background:transparent; border:1px solid var(--panel-border); color:var(--amber-bright); font-size:13px;
+    font-family:'Noto Sans TC',sans-serif;
+  }
+  .prayer-block{ margin-top:10px; padding:12px; border-radius:8px; background:rgba(0,0,0,0.28); }
+  .prayer-block.hidden{ display:none; }
+  .prayer-block p{ margin:0; font-size:13px; line-height:1.85; font-family:'Noto Serif TC',serif; color:var(--amber-bright); }
+  .memorial-list{ list-style:none; margin:0 0 12px; padding:0; }
+  .memorial-list li{ padding:8px 0; border-bottom:1px solid rgba(243,236,217,0.1); }
+  .memorial-list li strong{ display:block; font-size:13px; color:var(--amber-bright); margin-bottom:2px; }
+  .memorial-list li span{ font-size:12px; color:var(--parchment-dim); line-height:1.6; }
+
+  .community{ margin-top:18px; padding-top:16px; border-top:1px solid rgba(243,236,217,0.14); }
+  .community-status{ font-size:11.5px; color:var(--parchment-dim); margin:0 0 10px; }
+  .wall-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; max-height:150px; overflow-y:auto; }
+  .wall-item{ background:rgba(0,0,0,0.22); border-radius:8px; padding:7px 10px; }
+  .wall-item strong{ display:block; font-size:11.5px; color:var(--amber-bright); margin-bottom:2px; }
+  .wall-item span{ font-size:12px; color:var(--parchment); line-height:1.55; word-break:break-word; }
+  .wall-empty{ font-size:12px; color:var(--parchment-dim); margin:0 0 10px; }
+  #modal-card textarea{
+    width:100%; min-height:56px; border-radius:8px; border:1px solid rgba(243,236,217,0.25);
+    background:rgba(0,0,0,0.25); color:var(--parchment); padding:9px 10px; font-size:13px;
+    font-family:inherit; resize:vertical; margin-bottom:10px;
+  }
+  #modal-card .primary-btn{ margin-top:0; }
+
+  .quiz-section{ margin-top:18px; padding-top:16px; border-top:1px solid rgba(243,236,217,0.14); }
+  .quiz-progress{ font-size:11px; color:var(--parchment-dim); margin:0 0 8px; }
+  .quiz-question{ font-size:14px; line-height:1.7; margin:0 0 12px; font-family:'Noto Serif TC',serif; color:var(--amber-bright); }
+  .quiz-options{ display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+  .quiz-opt-btn{
+    width:100%; text-align:left; padding:10px 12px; border-radius:8px; cursor:pointer;
+    background:rgba(0,0,0,0.22); border:1px solid rgba(243,236,217,0.2); color:var(--parchment);
+    font-size:13px; font-family:inherit; line-height:1.5;
+  }
+  .quiz-opt-btn:disabled{ cursor:default; }
+  .quiz-opt-btn.correct{ background:rgba(143,191,140,0.28); border-color:#8FBF8C; color:#E9F5E8; }
+  .quiz-opt-btn.wrong{ background:rgba(201,90,90,0.28); border-color:#C95A5A; color:#F7E3E3; }
+  /* 栽培對話沒有標準答案，選了哪個只標示「已選擇」，不做對／錯判斷 */
+  .quiz-opt-btn.chosen{ background:rgba(232,163,61,0.26); border-color:var(--amber-bright); color:var(--parchment); }
+  .quiz-feedback{ font-size:12.5px; line-height:1.7; color:var(--parchment-dim); margin:8px 0 4px; min-height:1em; }
+  .quiz-result{ font-size:13.5px; line-height:1.8; padding:12px; border-radius:8px; background:rgba(232,163,61,0.14); border:1px dashed var(--panel-border); margin-top:8px; }
+
+  /* ---------- 主日學與受浸班預備：對話模擬 ---------- */
+  .dialogue-section{ margin-top:18px; padding-top:16px; border-top:1px solid rgba(243,236,217,0.14); }
+  .dialogue-role-btn{
+    display:block; width:100%; text-align:left; padding:11px 12px; margin:6px 0; border-radius:8px; cursor:pointer;
+    background:rgba(0,0,0,0.22); border:1px solid rgba(243,236,217,0.2); color:var(--parchment); font-family:inherit;
+  }
+  .dialogue-role-btn strong{ display:block; font-size:13.5px; color:var(--amber-bright); margin-bottom:3px; }
+  .dialogue-role-btn span{ display:block; font-size:11.5px; color:var(--parchment-dim); line-height:1.55; }
+  .dialogue-npc-line{
+    margin:0 0 12px; padding:10px 12px; border-radius:8px; line-height:1.75; font-size:13.5px;
+    font-family:'Noto Serif TC',serif; color:var(--parchment);
+    background:rgba(127,179,213,0.1); border:1px dashed rgba(127,179,213,0.45);
+  }
+
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="move-layer" aria-hidden="true"></div>
+
+<div id="topbar">
+  <div class="title-block">
+    <h1>同心守望之城</h1>
+    <p class="sub">3D多人代禱園 · 2026年9月20日（世界／教會／中國／受苦肢體／華夏守望葡萄園）</p>
+    <p id="stats-corner">🕯️ 載入中…</p>
+    <p id="conn-status"></p>
+  </div>
+  <div class="topbar-actions">
+    <button id="menu-btn" aria-label="選單">☰</button>
+    <button id="legend-btn" aria-label="地圖圖例">🗺️</button>
+  </div>
+</div>
+
+<div id="legend-panel">
+  <div class="panel-header"><span>地圖圖例</span><button id="legend-close-btn" class="panel-close" aria-label="關閉">×</button></div>
+  <div class="legend-item"><span class="dot" style="background:#7FB3D5;color:#7FB3D5"></span>🌍 世界之丘（北）</div>
+  <div class="legend-item"><span class="dot" style="background:#E9CD7A;color:#E9CD7A"></span>⛪ 眾教會山（東）</div>
+  <div class="legend-item"><span class="dot" style="background:#D97B5F;color:#D97B5F"></span>🏮 大地之邑（南）</div>
+  <div class="legend-item"><span class="dot" style="background:#B98AC4;color:#B98AC4"></span>🕯️ 守望燭巷（西）</div>
+  <div class="legend-item"><span class="dot" style="background:#9BC53D;color:#9BC53D"></span>🍇 華夏守望葡萄園（東北）</div>
+  <div class="legend-item"><span class="dot" style="background:#C9A227;color:#C9A227"></span>📜 紀念碑（城中央）</div>
+  <div class="legend-item"><span class="dot" style="background:#8FBF8C;color:#8FBF8C"></span>🙏 同心代禱壇（城中央）</div>
+  <div class="legend-item"><span class="dot" style="background:#F4C15C;color:#F4C15C"></span>🕯️ 祈禱亭（城中央）</div>
+</div>
+
+<div id="menu-panel">
+  <div class="panel-header"><span>選單</span><button id="menu-close-btn" class="panel-close" aria-label="關閉">×</button></div>
+  <button class="menu-item" id="sound-toggle-btn">🔊 音效：開</button>
+  <button class="menu-item" id="help-btn">ℹ️ 遊戲說明</button>
+  <button class="menu-item" id="backstart-btn">🏠 返回開頭畫面</button>
+</div>
+
+<div id="hint-banner"></div>
+<div id="toast"></div>
+
+<div id="stick-base"><div id="stick-knob"></div></div>
+<button id="interact-btn"><span class="ic">🤝</span><span>互動</span></button>
+
+<div id="modal-overlay" class="hidden">
+  <div id="modal-card"></div>
+</div>
+
+<div id="start-screen">
+  <div class="start-card">
+    <div class="lantern">🕯️</div>
+    <h1>同心守望之城</h1>
+    <div style="text-align:center;font-size:12px;color:#9a8f7a;margin:-4px 0 10px;">
+      📅 <a href="../" style="color:#9a8f7a;text-decoration:underline;">所有日期</a>　・　<a href="../sep18/" style="color:#9a8f7a;text-decoration:underline;">9/18 九一八紀念版</a>　・　<a href="../sep19/" style="color:#9a8f7a;text-decoration:underline;">9/19 全民國防教育日版</a>
+    </div>
+    <p class="desc">
+      這是一座以「2026年9月20日：世界、基督教界、中國大陸與中國大陸家庭教會」的大事與紀念所築成的3D禱告園，內容整合自兩位AI（Grok、ChatGPT）對同一天、四個提問的完整回應。<br><br>
+      今天是主日——七日的第一日；三大宗派共讀葡萄園工人的比喻（太20:1-16），天主教同時紀念韓國殉道者聖金大建司鐸。聯合國定今天為世界清潔日，中國大陸則借今天補國慶的班。今天夾在「恩典」與「忠心」之間，正是這座城邀請你帶著走一趟的功課：不是只看新聞，是在新聞背後，聽基督的心意、讀祂的話、獻上一則代禱。<br><br>
+      城的東北方是「華夏守望葡萄園」，裡面有三個站點：<b>每日研經站</b>今日查考馬太福音20:1-16與腓立比書1:20-24,27並回答研經問答；<b>主日學與受浸班預備</b>讓你模擬扮演「栽培員」或「慕道友」，練習用對話操練基要真理；<b>合一與守望代求</b>讓你在經文碑前為在位的、為各地神的僕人與平安度日的百姓代求——當夠多同行的肢體在相近時間一同按下祈禱鍵，碑文會發出金光，象徵眾聖徒的祈禱如香陳列。<br><br>
+      園中的代禱牆、燭光與問安是<b>共享</b>的：你留下的文字、點亮的燭光、舉起的燈籠，會被一同使用此園的弟兄姊妹看見；但因為這不是即時連線的虛擬實境，你不會看到別人的燈籠在地圖上同步走動——你會看到的，是他們留下的腳蹤、代禱與問安。
+    </p>
+    <label for="name-input">你的稱呼（會顯示在代禱牆與問安上）</label>
+    <input id="name-input" type="text" maxlength="16" placeholder="例如：匿名肢體 / 小羊">
+    <label>選一個燈籠的顏色</label>
+    <div class="avatar-row">
+      <div class="avatar-swatch selected" data-color="#E8A33D" style="background:#E8A33D"></div>
+      <div class="avatar-swatch" data-color="#7FB3D5" style="background:#7FB3D5"></div>
+      <div class="avatar-swatch" data-color="#8FBF8C" style="background:#8FBF8C"></div>
+      <div class="avatar-swatch" data-color="#C97B8F" style="background:#C97B8F"></div>
+      <div class="avatar-swatch" data-color="#B98AC4" style="background:#B98AC4"></div>
+      <div class="avatar-swatch" data-color="#D9CFAF" style="background:#D9CFAF"></div>
+    </div>
+    <button id="enter-btn" class="primary-btn">提燈進城 →</button>
+    <p class="start-note">提醒：園中的禱告文字只是範本，不是真正的禱告。真正的平安來自耶穌（約14:27）。願這園子引你更愛神、愛人、愛教會，而不是停留於工具、遠離真實群體。AI只能依聖經原則輔助反思，不能產生新啟示。</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================
+   內容資料 CONTENT DATA
+   來源：使用者提供之「人工智慧Grok、ChatGPT回應9月20日
+   世界上、基督教界、中國大陸和中國大陸基督教界大事與紀念」
+   完整文檔（兩份AI對四大範疇提問的完整回應全部併入）
+   ========================================================= */
+
+const MEMORIAL = {
+  id:'memorial',
+  title:'今天（9月20日）的節期與紀念',
+  summary:'今天是主日——七日的第一日，空墳墓的日子。天主教常年期第廿五主日，讀經正是馬太福音20:1-16「葡萄園工人的比喻」；新教（RCL）五旬節後第十七主日同樣讀這段福音；東正教仍在舉榮聖架節後主日，紀念大殉道者歐斯塔提一家。天主教同時紀念韓國殉道者聖金大建司鐸、聖鄭夏祥及103位同伴——金大建正是1846年9月20日斬首殉道。歐美許多堂會今天守「重返教會主日」，聯合國則定今天為「世界清潔日」。而在中國大陸，今天被借去補國慶的班，主日成了工作日。這座城邀請你，把「工人」「殉道」「安息」三個主題，一同帶到主面前。',
+  items:[
+    {name:'普世教會．主日／重返教會主日', note:'七日的第一日；歐美許多堂會守第17屆「Back to Church Sunday」'},
+    {name:'天主教．常年期第廿五主日', note:'讀經：依55:6-9、詠145、腓1:20-24,27、瑪20:1-16（葡萄園工人的比喻）'},
+    {name:'天主教．聖金大建司鐸、聖鄭夏祥及韓國殉道同伴紀念日', note:'共103位韓國殉道者；金大建是第一位韓國籍司鐸，1846年9月20日斬首'},
+    {name:'新教（RCL Year A）．五旬節後第十七主日／Proper 20', note:'福音同樣是葡萄園工人（太20:1-16）；書信腓1:21-30「我活著就是基督」'},
+    {name:'東正教（新曆）．舉榮聖架節後主日', note:'紀念大殉道者歐斯塔提（Eustathius）及其妻兒；明日（21日）舉榮聖架節日滿期'},
+    {name:'聯合國．世界清潔日（World Cleanup Day）', note:'今年主題「從乾淨的餐盤到乾淨的城市」；全球活動安排在中國浙江紹興'},
+    {name:'中國大陸．今日補班（非法定假日）', note:'為湊十一國慶連假，借走9月20日與10月10日；中秋正日在9月25日'},
+    {name:'即將到來．國際和平日、猶太曆贖罪日（9/21）', note:'明天也是使徒馬太紀念日；正教紀念七十使徒中的夸達徒'}
+  ],
+  reflect:'三大宗派今天竟讀到同一則比喻：葡萄園的主人一而再出去召人，末後的得與最先的同等。這不是巧合，是聖靈給這個主日的公共講章。你是清早進園、卻紅了眼的工人，還是酉初才被找到、卻喜樂領一錢銀子的人？'
+};
+
+const ALTAR = {
+  id:'altar',
+  title:'同心代禱壇 · 為萬事代求',
+  summary:'這裡不是某一則新聞的回應，而是為「凡你此刻放不下的」預備的壇。無論是霍爾木茲海峽仍在燃燒的油輪、尼泊爾山洪裡仍有五千人下落不明、四川鹽邊縣泥石流中失聯的三個名字、被瑞士法院判刑的幼童傷害案，或是成都茶館被拘的長者、北海看守所裡近十一個月未見天日的錫安八人、西安審判中的老牧師，或是你自己說不出口的重擔，都可以留在這裡；也讀一讀同行肢體剛留下的代禱與問安——他們與你並不同時在場，卻與你一同在這座城裡守望。',
+  verses:[
+    {text:'我勸你第一要為萬人懇求、禱告、代求、祝謝；為君王和一切在位的，也該如此。', ref:'提摩太前書2:1-2'},
+    {text:'又要彼此相顧，激發愛心，勉勵行善……不可停止聚會。', ref:'希伯來書10:24-25'}
+  ],
+  reflect:'你願意把心裡那個說不出口的重擔，寫在這裡，交託給垂聽禱告的主嗎？',
+  prayer:'聽禱告的主，你認得每一個名字，也聽得懂每一句還沒說完的話。求你把這園子裡每一則代禱都收在你手中，使我們因彼此的重擔，更明白你十字架的重量；也使我們因彼此的問安，更相信教會不是一個人的信仰，而是許多肢體。奉耶穌基督的名，阿們。'
+};
+
+const PAVILION = {
+  id:'pavilion',
+  title:'祈禱亭．為你',
+  summary:'這裡不是另一則新聞，是為「讀到這裡的你」預備的安靜角落。無論你今天帶著補班的疲憊、葡萄園比喻裡「紅了眼」的忌妒、還是自己說不出口的重擔而來，主都願意親自牧養你——正如今天的福音所說：家主一而再出去找人，酉初被召的，與清早進園的，同得生命的工價。',
+  verses:[
+    {text:'我留下平安給你們；我將我的平安賜給你們。我所賜的，不像世人所賜的。你們心裡不要憂愁，也不要膽怯。', ref:'約翰福音14:27'},
+    {text:'因我活著就是基督，我死了就有益處。', ref:'腓立比書1:21'}
+  ],
+  reflect:'合上螢幕之前，你願意為一位叫得出名字的人開口禱告嗎？',
+  prayer:'主啊，求你今天親自牧養這一位。若他被葡萄園裡的忌妒、補班的疲憊或世界的紛亂困住，求你使他因你作好人而不再紅眼；若他疲憊焦慮，求你用復活的盼望使他的心再次安定。叫任何螢幕上的文字，包括這一段，都漸漸衰微，叫基督在他裡面漸漸興旺。把你的平安——不像世人所賜的——安放在他心裡。奉耶穌的名，阿們。'
+};
+
+const ZONES = [
+  {
+    id:'world', name:'世界之丘', icon:'🌍', dirLabel:'北',
+    pos:{x:0, z:-34}, colorHex:'#3D5A80', glowHex:'#7FB3D5',
+    stations:[
+      { id:'w1', title:'霍爾木茲海峽戰事持續：油輪遭襲、利雅得遇襲、WTO示警',
+        summary:'伊朗戰爭與霍爾木茲海峽危機仍未止息。伊朗革命衛隊18日宣稱襲擊試圖通過海峽、掛多哥旗的油輪Trend；葉門胡塞武裝宣稱以導彈、無人機攻擊沙烏地首都利雅得及「敏感目標」，機場附近曾見火光濃煙。世貿組織總幹事稱霍爾木茲中斷是「八十年來全球貿易最大威脅」之一；美軍稱近月封鎖下仍護送逾十億桶原油過海峽。',
+        verses:[
+          {text:'祂止息刀兵，直到地極；祂折弓、斷槍，把戰車焚燒在火中。你們要休息，要知道我是神！', ref:'詩篇46:9-10'},
+          {text:'你們中間的爭戰鬥毆是從哪裡來的呢？不是從你們百體中戰鬥之私慾來的嗎？', ref:'雅各書4:1'}
+        ],
+        reflect:'油輪、導彈、濃煙——這些新聞常讓我們先問「誰贏了」。基督卻先止息刀兵、折斷弓槍。你今天願意先為海峽上不知名的水手代求嗎？',
+        prayer:'公義的主，求你止息霍爾木茲海峽與利雅得的刀兵，保護水手與平民，開通被封鎖的貿易與糧食。折斷我們心中的驕傲，如同你折斷弓槍。奉耶穌的名，阿們。' },
+      { id:'w2', title:'巴基斯坦科哈特清真寺外雙重自殺攻擊，至少31死',
+        summary:'18日，巴基斯坦開伯爾—普赫圖赫瓦省科哈特一座位於警察宿舍旁的清真寺外，發生雙重自殺汽車炸彈攻擊，至少31人死亡（含16名警員）、逾百人受傷；有組織宣稱負責。正在禱告的人仍可能遭遇暴力——這提醒我們，信仰不是「只要敬拜苦難就不會發生」的保證。',
+        verses:[
+          {text:'凡為義受逼迫的人有福了！因為天國是他們的。', ref:'馬太福音5:10'},
+          {text:'耶和華靠近傷心的人，拯救靈性痛悔的人。', ref:'詩篇34:18'}
+        ],
+        reflect:'清真寺外的攻擊提醒我們：暴力不分宗教場所。你願意為科哈特的傷者、也為所有在敬拜場所受威脅的人代求嗎？',
+        prayer:'主啊，求你安慰科哈特清真寺外死傷者的家屬，醫治傷者的身心，止住一切以恐怖手段殺害無辜的惡行。奉耶穌的名，阿們。' },
+      { id:'w3', title:'俄羅斯杜馬選舉三日投票，克里姆林宮扣押雀巢、歐尚等資產',
+        summary:'俄羅斯國會選舉三日投票進行中，這是首次在莫斯科吞併的烏克蘭地區同步舉行；選委稱網路投票遭網絡攻擊、遠東通訊線路有破壞企圖。克里姆林宮將雀巢、歐尚等外資企業資產置於臨時管理。另有蘇丹藍尼羅州戰事持續、南非九名女性遇害後爆發示威、荷蘭海牙發生反移民集會衝突。',
+        verses:[
+          {text:'外邦為什麼爭鬧？萬民為什麼謀算虛妄的事？……那坐在天上的必發笑。', ref:'詩篇2:1-4'},
+          {text:'你們不要倚靠君王，不要倚靠世人，他一點不能拯救。', ref:'詩篇146:3'}
+        ],
+        reflect:'選票、資產、示威——世界各地都在爭奪掌控權。你今天願意為被戰爭與強權捲入、卻無力發聲的百姓代求嗎？',
+        prayer:'主啊，求你憐憫在選舉、扣押與示威背後承受代價的普通百姓；求你保守蘇丹、南非與荷蘭的受害者，止住一切因仇恨而起的暴力。奉耶穌的名，阿們。' },
+      { id:'w4', title:'強權棋盤：美丹格陵蘭協議、川普簽署對俄伊制裁延至2031年',
+        summary:'美、丹、格陵蘭達成安全協議，擴大美永久駐軍、飛越與基地權；川普稱「美國將永遠擁有……的權利」。川普簽署擴大對俄制裁、並將對伊制裁延至2031年的法案，同時解除對厄利垂亞執政黨的制裁。川普下令禁止CNN、Politico、MS NOW進入白宮，並稱將成立「AI部隊」、任命AI沙皇；有報導指AI情報誤判幾乎導致美軍登上一艘中國船。',
+        verses:[
+          {text:'祂改變時候、日期，廢王、立王，將智慧賜與智慧人。', ref:'但以理書2:21'},
+          {text:'王的心在耶和華手中，好像隴溝的水隨意流轉。', ref:'箴言21:1'}
+        ],
+        reflect:'制裁、駐軍、AI沙皇——列強在重新畫線。人可以籌劃永遠，卻不知明天如何。你如何在關注時局時，仍不把安全感寄託在任何一方的軍力上？',
+        prayer:'主啊，求你使掌權者的心如隴溝的水在你手中流轉；求你攔阻AI誤判帶來的衝突，提醒我們技術不是中性到可以免責，人心才是關鍵。奉耶穌的名，阿們。' },
+      { id:'w5', title:'古巴全國電網再崩潰、大西洋熱帶低壓生成、德國建全球首座雷射核聚變電站',
+        summary:'古巴全國電網再度崩潰，民生陷入黑暗。大西洋在聖嬰年異常安靜中，第六號熱帶低壓在亞速爾群島附近生成。德國據報開建全球首座雷射核聚變電站，慕尼黑啤酒節同時開幕。聯合國大會第81屆高階週即將開始，秘書長人選第三次意向性投票已進行。',
+        verses:[
+          {text:'我們知道一切受造之物一同歎息、勞苦，直到如今。', ref:'羅馬書8:22'},
+          {text:'神是我們的避難所，是我們的力量，是我們在患難中隨時的幫助。', ref:'詩篇46:1'}
+        ],
+        reflect:'電網崩潰中的老人、風暴生成中的島民——受造之物的歎息與人的巧思同在。你今天願意為哈瓦那停電中的家庭代求嗎？',
+        prayer:'創造天地的主，求你叫古巴電網的黑暗中仍有人分享餅，安慰停電中的老人與病患；求你使核聚變等新技術，真正服事人，而不是被少數人壟斷。奉耶穌的名，阿們。' },
+      { id:'w6', title:'名古屋亞運開幕混亂：暴雨颱風、北韓國歌誤播、台灣部長一度被擋',
+        summary:'第20屆亞運會19日在愛知縣／名古屋揭幕，45個國家與地區、項目多於奧運。奧理會會長稱開幕式要「展現亞洲團結、對抗衝突」；實際卻有暴雨淹城、颱風逼近、選手接駁與住宿混亂、北韓國歌誤播給南韓曲棍球隊；台灣體育部長一度被擋在歡迎儀式外，後獲准參加。今日（20日）將產生首金，韓日男籃決賽亦在今晚。',
+        verses:[
+          {text:'凡較力爭勝的，諸事都有節制……只是要得不能壞的冠冕。', ref:'哥林多前書9:25'},
+          {text:'若是能行，總要盡力與眾人和睦。', ref:'羅馬書12:18'}
+        ],
+        reflect:'口號喊著「亞洲團結」，場外卻是國歌誤播、部長被擋。人的節慶可以暫時把旗幟排成一幅拼圖，卻無法拆毀心裡的牆。你能否也為對手國家的運動員獻上祝福？',
+        prayer:'主啊，求你賜亞運場上每一位運動員平安與公平的競賽；求你使體育的舞台成為跨越民族與政治差異的橋樑，而不是驕傲與羞辱的溫床。奉耶穌的名，阿們。' },
+      { id:'w7', title:'尼泊爾波科西山洪：逾千遺體尋獲，仍逾5000人失蹤',
+        summary:'8月26日冰岩崩引發的波科西／特里蘇利山洪，最新公開數字約1,300-1,400具遺體尋獲，失蹤仍逾5,000人（含數百名外國旅客）。總理沙阿19日稱預警系統為「最優先」；年輕政府正要求主要排碳國對氣候災害作出賠償。這場災難仍在持續發酵，家屬仍在等待名字。',
+        verses:[
+          {text:'你們以為那些人比一切住在耶路撒冷的人更有罪嗎？我告訴你們，不是的！你們若不悔改，都要如此滅亡！', ref:'路加福音13:2-5'},
+          {text:'與哀哭的人要同哭。', ref:'羅馬書12:15'}
+        ],
+        reflect:'五千多個仍未確認的名字——這不是一則已經過去的新聞，是仍在等待答案的家庭。你願意持續為尼泊爾的搜救與失蹤者家屬代求，而不是把它當成「上週的新聞」嗎？',
+        prayer:'掌權的主，尼泊爾的家屬還在等名字。求你與哀哭的人同哭，給尋獲者氣力，給失散家庭引路的光；也求你感動列國，真實地承擔對氣候脆弱地區的責任。奉耶穌的名，阿們。' },
+      { id:'w8', title:'南海中菲再碰撞、朝鮮半島緊張、日銀升息、馬來西亞納吉獲軟禁',
+        summary:'18日中菲船隻再碰撞，雙方互指對方撞擊。金正恩視察軍工，朝鮮指責美韓日軍演推動北核擴張；南韓總統李在明排除向霍爾木茲派兵。日銀18日加息至1.25%，為1995年以來最高。馬來西亞前首相納吉1MDB案獲有條件赦免，改為軟禁至2028年。菲律賓南哥打巴托邦阿中學再傳槍擊，學生死傷。',
+        verses:[
+          {text:'各人要快快地聽，慢慢地說，慢慢地動怒。', ref:'雅各書1:19'},
+          {text:'欺壓貧窮為要利己的，並送禮與富戶的，都必缺乏。', ref:'箴言22:16'}
+        ],
+        reflect:'船隻碰撞、軍演、升息、特赦、槍擊——同一週末的亞太新聞疊在一起，容易讓人麻木。你今天願意特別為班阿中學的學生與家庭代求嗎？',
+        prayer:'主啊，求你使中菲、朝鮮半島的緊張走向溝通而非誤判；求你安慰班阿中學受傷的學生與家庭，醫治這個聽不見哀號的世代。奉耶穌的名，阿們。' }
+    ]
+  },
+  {
+    id:'church', name:'眾教會山', icon:'⛪', dirLabel:'東',
+    pos:{x:34, z:0}, colorHex:'#7A611F', glowHex:'#E9CD7A',
+    stations:[
+      { id:'c1', title:'教宗良十四世致拉丁美洲主教函，羅馬教區「少做一點，做得更好」',
+        summary:'適逢主保聖杜利比奧宣聖三百周年，教宗良十四世致函拉丁美洲及加勒比海主教，勸主教教導要清楚、不可丟棄羊群，當耕耘內在生命。18日羅馬教區新牧靈年開幕，教宗對司鐸說：「少做一點，做得更好」——把焦點收回與基督相遇、團體生活、服務這座城，而不是活動堆疊。',
+        verses:[
+          {text:'馬大，馬大，你為許多的事思慮煩擾；但是不可少的只有一件。', ref:'路加福音10:41-42'},
+          {text:'我是好牧人；好牧人為羊捨命。', ref:'約翰福音10:11'}
+        ],
+        reflect:'活動可以堆到亞運開幕式那樣華麗，若沒有坐在主腳前，羊仍飢餓。你的服事，是「多做」還是「更真地與人相遇」？',
+        prayer:'善牧啊，求你使牧者教導清楚、不丟棄羊群；求你教我們「少做一點，做得更好」，把焦點收回與你、與弟兄姊妹真實的相遇。奉耶穌的名，阿們。' },
+      { id:'c2', title:'拿坡里聖雅納略血液化：紀念一場305年的殉道',
+        summary:'19日上午約10:04，拿坡里主教座堂宣布主保聖雅納略（San Gennaro）的血再次液化；白手帕揮動、掌聲響起。這是紀念他於公元305年9月19日殉道的日子。無論人如何解釋這現象，禮儀本身指向一件不可談判的事：教會是用血買來的。',
+        verses:[
+          {text:'你們是重價買來的。', ref:'哥林多前書6:20'},
+          {text:'他們……是從大患難中出來的，曾用羔羊的血把衣裳洗白淨了。', ref:'啟示錄7:14'}
+        ],
+        reflect:'一年一度的紀念，提醒教會：增長大會、青年日場館、節慶固然可貴，但別忘了教會是用血買來的。你今天記得這份重價嗎？',
+        prayer:'主耶穌，感謝你用自己的血，只一次進入聖所，成了永遠贖罪的事。求你使我們既紀念殉道者的血，也不把殉道浪漫化或當成民族燃料。奉你的名，阿們。' },
+      { id:'c3', title:'墨西哥再有司鐸遇害：本任總統上任以來第四位',
+        summary:'韋胡特拉教區聖十字堂本堂司鐸羅曼·德拉克斯·埃爾南德斯（48歲）9月15日遭槍擊，遺體棄於公路旁。主教團稱暴力「令人震驚」，要求徹底調查。自現任總統上任以來，已有四名司鐸遇害；墨西哥仍是全球對天主教神職最致命的國家之一。消息在18-19日持續震動拉丁美洲教會。',
+        verses:[
+          {text:'凡使這信我的一個小子跌倒的，倒不如把大磨石拴在這人的頸項上，沉在深海裡。', ref:'太18:6（延伸：為受害牧者呼求公義）'},
+          {text:'聖潔真實的主啊，你不審判住在地上的人，給我們伸流血的冤，要等到幾時呢？', ref:'啟示錄6:10'}
+        ],
+        reflect:'一位牧養小堂的司鐸，被棄在公路旁——這不是遙遠的新聞，是又一個名字加進殉道者名單。你願意為墨西哥的神職人員與他們牧養的百姓代求嗎？',
+        prayer:'主啊，求你徹底審視這樁暴力，使真相與公義得以彰顯；求你保護墨西哥所有仍在服事的神職人員，安慰羅曼神父的家人與堂區。奉耶穌的名，阿們。' },
+      { id:'c4', title:'烏克蘭正教會都主教安息，世基聯訪基輔，烏方裁定UOC隸屬莫斯科',
+        summary:'奧夫魯奇及科羅斯滕都主教維薩里翁於18日安息主懷，年72歲。世界基督教協進會代表團近日訪基輔，討論俄羅斯正教會在戰時的角色；烏克蘭當局正式認定烏克蘭正教會（UOC）與莫斯科宗主教區有隸屬關係——教會分裂與戰爭仍纏在一起。阿拉斯加安克拉治顯聖容希臘正教堂18日晚舉行祝聖禮儀，逾百名信徒聚集。',
+        verses:[
+          {text:'我不但為這些人祈求，也為那些因他們的話信我的人祈求，使他們都合而為一。', ref:'約翰福音17:20-21'},
+          {text:'但我斷不以別的誇口，只誇我們主耶穌基督的十字架。', ref:'加拉太書6:14'}
+        ],
+        reflect:'戰爭中的教會，同時面對炮火與教會治理的撕裂。你願意為烏克蘭正教會的合一、也為一位安息主懷的都主教家人代求嗎？',
+        prayer:'主啊，求你醫治烏克蘭正教會在戰火與法律撕裂中的傷口；安慰維薩里翁都主教的教區與親人；求你使阿拉斯加新祝聖的小堂連於普世的身體。奉耶穌的名，阿們。' },
+      { id:'c5', title:'中國家庭教會受國際矚目：丁書祺講述酷刑，德州教會禁食禱告',
+        summary:'成都秋雨聖約教會牧師丁書祺公開講述酷刑，警告中共「試圖碾碎」信仰。美國德州艾倫市18日舉行「為中國受迫害教會禁食禱告日」，錫安教會、秋雨、對華援助協會等連線；錫安教會多名牧者同工已被扣近11個月。這些見證提醒普世教會：受苦的肢體不是新聞素材，而是身體的一部分。',
+        verses:[
+          {text:'你們要記念被捆綁的人，好像與他們同受捆綁；也要記念遭苦害的人。', ref:'希伯來書13:3'},
+          {text:'若一個肢體受苦，所有的肢體就一同受苦。', ref:'哥林多前書12:26'}
+        ],
+        reflect:'「好像」二字極重：不是圍觀，是身體的同感。你今天願意為丁書祺牧師的見證、也為錫安教會仍被扣的牧者代求嗎？',
+        prayer:'主啊，求你剛強丁書祺牧師與一切為受逼迫教會發聲的人；求你紀念錫安教會仍被扣近11個月的牧者，賜他們忍耐與盼望。奉耶穌的名，阿們。' },
+      { id:'c6', title:'伊朗最古老新教教堂被沒收，阿爾及利亞12名基督徒因聚會被捕',
+        summary:'聯合國專家要求伊朗解釋沒收該國最古老新教教堂、驅逐基督徒一事。阿爾及利亞警方沒收聖經，12名基督徒因舉行非穆斯林聚會被捕。這些案例提醒我們：宗教自由的收緊，往往從一間教堂、一次聚會的取締開始。',
+        verses:[
+          {text:'順從神，不順從人，是應當的。', ref:'使徒行傳5:29'},
+          {text:'你當為啞巴開口，為一切孤獨的人伸冤。', ref:'箴言31:8'}
+        ],
+        reflect:'一座最古老的教堂被沒收、一次聚會被定罪——這些具體的事件，比抽象的「宗教自由指數」更接近真實的人。你願意為伊朗與阿爾及利亞的肢體具體代求嗎？',
+        prayer:'主啊，求你為被沒收教堂的伊朗信徒、被捕的阿爾及利亞肢體開路；求你感動掌權者，使宗教自由得到真實的保障。奉耶穌的名，阿們。' },
+      { id:'c7', title:'英國福音派逆勢增長：年輕男性成為增長主力',
+        summary:'研究顯示，英國福音派未隨整體宗教衰退而下滑，年輕男性成為增長主力，福音派群體也呈現較年輕、族裔更加多元等特徵。美國基督改革宗教會（CRC）繼續按《人類性倫理報告》執行紀律，自由派堂會離開後，聖經立場反而更清晰。這提醒教會：忠於聖經的清晰，往往比追求人數的討好更能生根。',
+        verses:[
+          {text:'你們若常常遵守我的道，就真是我的門徒。', ref:'約翰福音8:31'},
+          {text:'知識是叫人自高自大，惟有愛心能造就人。', ref:'哥林多前書8:1'}
+        ],
+        reflect:'「福音派比例增加」不等於「整個西方教會全面復興」。教會真正的復興不是人更多，而是人更多地成為基督的門徒。你的教會如何分辨「數字增長」與「門徒增長」？',
+        prayer:'主啊，求你使教會的增長不只是人數的增長，而是門徒真實成長的增長；求你堅固年輕一代對福音的渴慕，使其持續生根，不止於一時的熱度。奉耶穌的名，阿們。' },
+      { id:'c8', title:'今日共同福音：葡萄園工人與韓國殉道者，同一個主日的兩堂課',
+        summary:'今天天主教常年期第廿五主日、新教RCL Proper 20，福音都是葡萄園工人的比喻（太20:1-16）；同時天主教紀念聖金大建司鐸與103位韓國殉道者。「在後的將要在前，在前的將要在後」與「忠於基督直到斬首」，在同一個主日相遇——恩典冒犯我們的功勞帳，殉道提醒我們忠心的代價。',
+        verses:[
+          {text:'我作好人，你就紅了眼嗎？這樣，那在後的將要在前，在前的將要在後了。', ref:'馬太福音20:15-16'},
+          {text:'因我活著就是基督，我死了就有益處。', ref:'腓立比書1:21'}
+        ],
+        reflect:'金大建15歲受洗，知道這路通向斬首，仍去讀神學、再潛回朝鮮傳道。你忌妒誰的恩典？又願意為誰的忠心付上代價？',
+        prayer:'主耶穌，求你治好我們功勞帳裡的紅眼，使晚來的不被輕看，先來的不自義；求你使殉道者的血成為福音的種子，而非我們自誇的談資。奉你的名，阿們。' }
+    ]
+  },
+  {
+    id:'china', name:'大地之邑', icon:'🏮', dirLabel:'南',
+    pos:{x:0, z:34}, colorHex:'#8B4A36', glowHex:'#D97B5F',
+    stations:[
+      { id:'cn1', title:'習近平訪美在即：白宮公布行程，何立峰赴美磋商',
+        summary:'白宮公布習近平訪美行程，約23日起國事訪問，24日會談並出席國宴；川普據報將親赴安德魯斯空軍基地迎接。何立峰已率團赴美經貿磋商，19日在紐約與美財長貝森特會談，議題含關稅、AI、稀土、美車市准入。王毅稍早已與美國務卿魯比奧通話，強調「管控分歧、尊重彼此核心利益」。',
+        verses:[
+          {text:'王的心在耶和華手中，好像隴溝的水隨意流轉。', ref:'箴言21:1'},
+          {text:'你要為君王和一切在位的禱告，使我們可以敬虔、端正、平安無事地度日。', ref:'提摩太前書2:2'}
+        ],
+        reflect:'國宴、迎接儀式、談判桌——這些鏡頭容易讓人把「峰會成功」當成彌賽亞。你今天願意為談判中的誠信、也為普通百姓不成為大國競爭代價代求嗎？',
+        prayer:'主啊，求你賜下週的習特會智慧與克制，使雙方在競爭中仍保留對話；求你使關稅與貿易的協商，不讓普通人民成為代價。奉耶穌的名，阿們。' },
+      { id:'cn2', title:'健康傳聞與73歲的雲霧：金磚峰會晚宴缺席，各方回應不一',
+        summary:'華爾街日報等稱習近平在印度金磚峰會晚宴因身體不適缺席，由王毅代為出席，外界再議73歲領導人的健康與接班；多方稱訪美行程目前仍在。印度外交部亦駁斥「多國領袖峰會後病倒」的社媒傳言。健康傳聞真假難辨，卻提醒我們：權柄與生命都是借來的。',
+        verses:[
+          {text:'你們的生命是什麼呢？你們原來是一片雲霧，出現少時就不見了。', ref:'雅各書4:14'},
+          {text:'求你指教我們怎樣數算自己的日子，好叫我們得著智慧的心。', ref:'詩篇90:12'}
+        ],
+        reflect:'健康傳聞、接班猜測——這些新聞背後，是每一個掌權者都同樣脆弱的身體。你今天願意為所有承受權位重擔的人代求，而不只是消費傳聞嗎？',
+        prayer:'主啊，你數算列王的日子，也數算我們的日子。求你賜智慧的心給一切在位的人，也提醒我們：權柄是借來的，雲霧會散，唯有你長存。奉耶穌的名，阿們。' },
+      { id:'cn3', title:'川普簽署對俄伊制裁法，中方稱保留採取必要措施的權利',
+        summary:'川普簽署對俄／伊制裁法，可對進口俄油氣的第三國加徵最高100%次級關稅。中國商務部19日稱將密切關注，保留採取一切必要措施的權利，盼對話穩定經貿。海外分析指美丹格陵蘭協議也有針對中俄的面向；香山論壇學者稱美方太空武器「打破禁忌」，或觸發新軍備競賽。',
+        verses:[
+          {text:'外邦為什麼爭鬧？萬民為什麼謀算虛妄的事？……那坐在天上的必發笑。', ref:'詩篇2:1-4'},
+          {text:'不要以惡報惡……不可為惡所勝，反要以善勝惡。', ref:'羅馬書12:17,21'}
+        ],
+        reflect:'制裁與反制裁的循環，容易升級成更大的對抗。你今天願意為中美俄三方的克制、也為不被捲入強權博弈的普通人代求嗎？',
+        prayer:'主啊，求你攔阻制裁與反制裁的循環升級成更大的衝突；求你使掌權者以善勝惡，而不是以惡報惡，保護普通人民不成為代價。奉耶穌的名，阿們。' },
+      { id:'cn4', title:'九一八95周年餘波：警世鐘、防空警報、深圳日人學校加強戒備',
+        summary:'瀋陽殘歷碑廣場「勿忘九一八」撞鐘鳴警：14人撞「警世鐘」14下，寓意十四年抗戰；9時18分遼寧各市防空警報三分鐘。政治局委員李鴻忠、公安部長王小洪、軍委副主席張升民等出席。外交部稱「絕不允許日本軍國主義死灰復燃」；深圳日本人學校加強戒備（距男童遇襲兩周年）。',
+        verses:[
+          {text:'因祂使我們和睦，將兩下合而為一，拆毀了中間隔斷的牆。', ref:'以弗所書2:14'},
+          {text:'要愛你們的仇敵，為那逼迫你們的禱告。', ref:'馬太福音5:44'}
+        ],
+        reflect:'記住侵略的罪惡是公義的，但聖經同樣拆毀「我們民族永遠正義、對方永遠魔鬼」的偶像。你今天願意為深圳的日本孩子、也為所有活在歷史陰影下的孩子代求嗎？',
+        prayer:'公義的神，你恨惡流無辜人血的手，也恨惡用記憶去製造新的仇恨。求你讓九一八的紀念產生悔改與和平，而不是新的仇恨，保護各國的孩子。奉耶穌的名，阿們。' },
+      { id:'cn5', title:'國務院常務會議：老齡工作、醫療康復護理擴容、中醫藥保護草案',
+        summary:'李強18日主持國務院常務會議：聽取老齡工作、研究體育賽事健康發展、部署醫療康復護理擴容、通過《中醫藥傳統知識保護條例（草案）》、討論突發事件應對法等15部法律修正案。同期數據：1-8月一般公共預算收入15.66萬億元（+5.7%），吸收外資4799.5億元，鐵路客運33.2億人次，人民幣中間價創三年半新高。',
+        verses:[
+          {text:'在白髮的人面前，你要站起來，也要尊敬老人。', ref:'利未記19:32'},
+          {text:'在神我們的父面前，那清潔沒有玷污的虔誠，就是看顧在患難中的孤兒寡婦。', ref:'雅各書1:27'}
+        ],
+        reflect:'人口老齡化、醫療擴容的討論背後，是一位位需要被看顧的長者。你的教會如何具體地尊榮、服事年長的肢體，而不只是把他們當成「被照顧的對象」？',
+        prayer:'主啊，求你使人口與醫療政策的討論，真正落到對每一位長者與病人的尊榮與照顧；求你提醒我們，一切生命的價值出於你的形像，不在於能否生產。奉耶穌的名，阿們。' },
+      { id:'cn6', title:'四川攀枝花鹽邊縣泥石流：2死3失聯，地質災害應急響應啟動',
+        summary:'19日凌晨，四川省攀枝花市鹽邊縣格薩拉鄉支六河村石家溝隧道附近發生泥石流，最初5人失聯，截至19日22時已尋獲2人（均無生命跡象），另3人仍在搜救。當地仍有降雨，存在再次發生山洪、泥石流的風險；應急管理部已啟動國家地質災害四級應急響應。',
+        verses:[
+          {text:'你們以為那些人比一切住在耶路撒冷的人更有罪嗎？我告訴你們，不是的！', ref:'路加福音13:2-3'},
+          {text:'耶和華靠近傷心的人，拯救靈性痛悔的人。', ref:'詩篇34:18'}
+        ],
+        reflect:'五個家庭面對突如其來的災難——不是數字，是名字。你今天願意為鹽邊縣仍在搜救中的三個人、也為救援人員的安全代求嗎？',
+        prayer:'主啊，求你憐憫鹽邊縣泥石流中受災的家庭，保守正在冒雨搜救的人員，使失聯者早日被尋獲；求你止住再次降雨帶來的二次災害。奉耶穌的名，阿們。' },
+      { id:'cn7', title:'北京周邊28萬平方公里「特殊限制空域」今起實施',
+        summary:'中國自9月20日起在北京周邊設置大範圍「特殊限制區」，面積超過28萬平方公里，涵蓋北京、天津、河北大部以及內蒙古、山西、山東、遼寧部分地區和渤海部分海域。除民航、獲准的商務航空及軍警消防等特定飛行外，其他航空活動受到嚴格限制，相關措施與6月26日一架輕型運動飛機在北京失事有關。',
+        verses:[
+          {text:'通達人見禍藏躲；愚蒙人前往受害。', ref:'箴言22:3'},
+          {text:'若不是耶和華看守城池，看守的人就枉然警醒。', ref:'詩篇127:1'}
+        ],
+        reflect:'安全管理可以降低風險，卻不能給人終極安全感。你如何在支持合理的安全制度時，仍記得真正的看守者是誰？',
+        prayer:'主啊，求你保護每一位飛行的人，使新的空域管制真正保護生命，而不只是行政擴權；求你提醒我們，唯有你是城池真正的看守者。奉耶穌的名，阿們。' },
+      { id:'cn8', title:'四平台遭反壟斷立案調查，PIESAT衛星發射成功',
+        summary:'中國市場監管部門被報道正在調查美團旗下北京三快、阿里旗下杭州淘美，以及同程、途家等企業，涉及涉嫌不正當競爭；相關企業均表示會配合調查。這是繼此前對在線酒店預訂市場大額反壟斷處罰之後的又一輪監管行動。同日，中國成功發射PIESAT-2第13至16星，是長征系列運載火箭第668次飛行。',
+        verses:[
+          {text:'詭詐的天平為耶和華所憎惡；公平的法碼為他所喜悅。', ref:'箴言11:1'},
+          {text:'人算甚麼，你竟顧念他？世人算甚麼，你竟眷顧他？', ref:'詩篇8:4'}
+        ],
+        reflect:'商業需要誠實，科技本身不是偶像也不是罪——真正的問題是：人使用科技與權力之後，把榮耀歸給誰？',
+        prayer:'主啊，求你使市場監管出於真正的公義，而非選擇性的執法；求你使中國航天科技的進步，成為服事人、而非取代神的工具。奉耶穌的名，阿們。' }
+    ]
+  },
+  {
+    id:'persecuted', name:'守望燭巷', icon:'🕯️', dirLabel:'西',
+    pos:{x:-34, z:0}, colorHex:'#4A2E50', glowHex:'#B98AC4',
+    stations:[
+      { id:'p1', title:'成都秋雨／恩慈團契：茶館讀書會後續，丁書祺華府講述酷刑',
+        summary:'9月10日，恩慈團契長老們在武侯區茶館讀經議事，紅牌樓派出所帶走11人，多數逾60歲，何福濤長老73歲、肺癌切除後仍需急救。至週六上午九人獲釋；吳五清長老、沈曉慶弟兄被控「非法組織傳教」，各行政拘留10日並罰款。丁書祺牧師近日在華府聖經博物館論壇講述抄家、拘留、監視，稱有人只因讀書會就被抓。王怡牧師仍在服刑，約2027年12月才滿。',
+        verses:[
+          {text:'要記念被捆綁的人，好像與他們同受捆綁。', ref:'希伯來書13:3'},
+          {text:'在你們中間，誰有病了，他就該請教會的長老來。', ref:'雅各書5:14'}
+        ],
+        reflect:'一群年長的弟兄姊妹，只是在讀書聚會裡讀經、團契，卻被以「非法傳教」處理。你今天願意具體地為吳五清長老與沈曉慶弟兄代求嗎？',
+        prayer:'主啊，求你看顧仍被拘留的吳五清長老與沈曉慶弟兄，醫治年長信徒何福濤的身體，賜他們的家人安慰，也剛強丁書祺牧師的見證。奉耶穌的名，阿們。' },
+      { id:'p2', title:'北京錫安「八人」：仍羈押廣西北海近11個月，律師被約談要求退出',
+        summary:'金明日牧師7月經高層外交接觸後獲釋，仍有八位牧者同工關在廣西北海第一、二看守所，已近11個月：高穎佳、尹會彬、王林、王聰、劉楨彬、林書鋮、汪中、吳秋雨。罪名多為「詐騙」「非法經營」。原定8月開庭因律師閱卷不足延期。9月中家書指監所擁擠、醫療不足，司法局約談辯護律師要求退出；王林牧師給母親、林書鋮牧師給兒子的家書，吳秋雨師母在獄中用饅頭牛奶守聖餐——在9月11-17日被教會公開。',
+        verses:[
+          {text:'我在監裡，你們來看我。', ref:'馬太福音25:36'},
+          {text:'你務要至死忠心，我就賜給你那生命的冠冕。', ref:'啟示錄2:10'}
+        ],
+        reflect:'八個名字，八個仍在看守所裡的身體：高穎佳、尹會彬、王林、王聰、劉楨彬、林書鋮、汪中、吳秋雨。你願意逐一唸出這八個名字為他們代求嗎？',
+        prayer:'主耶穌，求你看顧這八位肢體，醫治他們的身體，賜他們夠用的糧食與盼望；也求你保守他們的辯護律師不被恐嚇脅迫，繼續能為他們辯護。奉耶穌的名，阿們。' },
+      { id:'p3', title:'西安光之谷牧師唐秉義受審，檢方對近70歲牧者求刑12-13年',
+        summary:'西安家庭教會牧師唐秉義家人9月17日發出代禱信——「詐騙」案邁向開庭；同教會近70歲的牧者，檢方據報求刑12至13年，把近20年奉獻（起訴書稱約2550萬元）整體視為詐騙所得，其中僅230萬元對應235名「被害人」。把信徒的奉獻算成「詐騙金額」，是把信仰刑事化的常見手法。',
+        verses:[
+          {text:'凡為義受逼迫的人有福了！因為天國是他們的。', ref:'馬太福音5:10'},
+          {text:'我們留心行光明的事，不但在主面前，就在人面前也是這樣。', ref:'哥林多後書8:21'}
+        ],
+        reflect:'一位近70歲的牧者，因牧養20年的奉獻被求刑12至13年——你願意為審判的公義、也為唐秉義牧師的家人代求嗎？',
+        prayer:'主啊，求你看顧唐秉義牧師與這位近70歲的老牧者，使審判的過程有真正的公義；也求你使各地教會在奉獻上行光明的事，不但在主面前，也在人面前。奉耶穌的名，阿們。' },
+      { id:'p4', title:'浙江牧師黃益梓案再延判決，曹三強罹癌無法就醫',
+        summary:'浙江溫州牧師黃益梓（十餘年前因反對拆十字架屢被關押）案件，法院再度延期宣判，他另因「非法經營」（講道錄音等）被辦。美籍華人牧師曹三強2017年起被囚七年，2024年出獄後仍無法取得護照離開中國與家人團聚，據報正與四期癌症搏鬥；團體發起聯署，盼習特會前提名釋放。',
+        verses:[
+          {text:'十字架的道理，在那滅亡的人為愚拙，在我們得救的人卻為神的大能。', ref:'哥林多前書1:18'},
+          {text:'弟兄要把弟兄，父親要把兒子，送到死地。', ref:'馬太福音10:21'}
+        ],
+        reflect:'一位患病七年才出獄、卻仍拿不到護照的牧者；一場一再延期的判決——你能否為曹三強牧師的護照與醫療、也為黃益梓牧師的案件代求？',
+        prayer:'主啊，求你使曹三強牧師早日取得護照、得到醫治，與家人團聚；求你紀念黃益梓牧師懸而未決的案件，使公義早日臨到。奉耶穌的名，阿們。' },
+      { id:'p5', title:'黃雪琴（Sophia）5年刑期屆滿，仍無正式獲釋確認',
+        summary:'記者、#MeToo推動者黃雪琴5年刑期於9月18日屆滿；另有4年剝奪政治權利。無國界記者、國際特赦等60個團體呼籲保障其真正自由。截至公開報導，尚未有正式獲釋確認，友人預料她仍將持續受到監控、干預防止出國。',
+        verses:[
+          {text:'祂差遣我報告被擄的得釋放……叫那受壓制的得自由。', ref:'路加福音4:18'},
+          {text:'伸冤在我，我必報應。', ref:'羅馬書12:19'}
+        ],
+        reflect:'刑期到了，人卻不一定真正自由——這種「附加的監控」往往比刑期本身更長。你願意為黃雪琴的真正自由、也為一切刑滿仍不自由的人代求嗎？',
+        prayer:'釋放俘虜的主，求你叫監牢的門真正打開，監視的眼不能作神；醫治黃雪琴被剝奪的歲月，恢復她的尊嚴與真正的自由。奉耶穌的名，阿們。' },
+      { id:'p6', title:'重慶主教丁揚祝聖：中梵協議下第18位主教，地下教會仍受限',
+        summary:'丁揚（聖名安德肋）9月8日在重慶聖若瑟堂獲祝聖，是中梵《臨時協議》下第18位主教，也是良十四世任內第八場。中方公告稱「重慶教區主教」，隻字不提教宗；梵蒂岡稱「重慶總教區總主教」。地下教會處境仍艱難：拒絕加入愛國會者面對任意拘押、軟禁；神職人員護照上交，出境須國家批准；崔泰、馬達欽等地下主教據報仍被限制。',
+        verses:[
+          {text:'我的國不屬這世界。', ref:'約翰福音18:36'},
+          {text:'我要把我的教會建造在這磐石上；陰間的權柄不能勝過他。', ref:'馬太福音16:18'}
+        ],
+        reflect:'協議帶來了「合法主教」的名字，沒有自動帶來良心的自由。你願意為新祝聖的丁揚主教、也為仍受限的地下主教一同代求嗎？',
+        prayer:'善牧，求你看顧新祝聖的丁揚主教與所有地下的神父，使他們記得祭台屬於你，不屬於任何協議或公告；求你堅固被限制的主教與教友。奉耶穌的名，阿們。' },
+      { id:'p7', title:'USCIRF與國際教會再籲：習近平訪美前釋放宗教囚犯名單',
+        summary:'美國國際宗教自由委員會（USCIRF）9月18日重申長期關注中國宗教自由狀況，特別提到獨立新教領袖遭拘捕，以及天主教方面面臨的宗教自由問題，籲在9月24日習近平訪美時再提宗教囚犯名單：北京錫安八人、西安唐秉義、曹三強，以及新疆、西藏宗教囚犯。人權觀察9月9日報道，2026上半年已有十二座以上城市獎勵舉報「非法」宗教活動。',
+        verses:[
+          {text:'我在監裡，你們來看我。', ref:'馬太福音25:36'},
+          {text:'要愛你們的仇敵，為那逼迫你們的禱告。', ref:'馬太福音5:44'}
+        ],
+        reflect:'一份名單背後，是一個個有名有姓的肢體。你願意把這份名單——錫安八人、唐秉義、曹三強——當作自己的代禱清單嗎？',
+        prayer:'主啊，你吩咐我們為君王和一切在位的祈求，也為逼迫我們的禱告。求你在習近平訪美之前，感動掌權者釋放更多因信仰被囚的肢體。奉耶穌的名，阿們。' },
+      { id:'p8', title:'葡萄園比喻對受苦教會的安慰：末後的與最先的，同得一錢銀子',
+        summary:'今天普世教會共讀葡萄園工人的比喻（太20:1-16），同時紀念韓國殉道者聖金大建。三自愛國教會多數信徒日常仍能在紅線內聚會；被打壓的集中在拒絕登記與「中國化」教義改造、跨地區網絡牧養、奉獻被定性為經營／詐騙的群體。今天特別適合把三段經文放在一起：為受苦者——來13:3；為忠心——啟2:10；為基督的平安——約14:27。',
+        verses:[
+          {text:'那在後的將要在前，在前的將要在後了。', ref:'馬太福音20:16'},
+          {text:'愛裡沒有懼怕。', ref:'約翰壹書4:18'}
+        ],
+        reflect:'海外可以自由「重返教會」的，不要紅眼看國內酉初才被找到、卻付上拘留代價的人；國內能安靜聚會的，也不要輕看茶館裡七十歲的長老。工價不是安全，是基督自己。',
+        prayer:'主耶穌，求你使中國教會在患難中不失去盼望，在壓力中不失去愛，在不公義中不以惡報惡；也求你使記念被捆綁者的心，不像看戲，像同受捆綁。奉主耶穌基督的名，阿們。' }
+    ]
+  },
+  {
+    id:'vineyard', name:'華夏守望葡萄園', icon:'🍇', dirLabel:'東北',
+    pos:{x:30, z:-30}, colorHex:'#3F4D2A', glowHex:'#9BC53D',
+    stations:[
+      { id:'cn-bible', title:'每日研經站．馬太福音20:1-16與腓立比書1:20-24,27',
+        summary:'今天三大宗派共讀同一段福音：葡萄園工人的比喻（太20:1-16）。「約在酉初出去，看見還有人站在那裡……先雇的……就埋怨家主……家主說：我作好人，你就紅了眼嗎？這樣，那在後的將要在前，在前的將要在後了。」新教書信同讀腓立比書1:21：「因我活著就是基督，我死了就有益處。」以賽亞書55:8也在今天的讀經之列：「我的意念非同你們的意念，我的道路非同你們的道路。」',
+        verses:[
+          {text:'家主……說：我作好人，你就紅了眼嗎？這樣，那在後的將要在前，在前的將要在後了。', ref:'馬太福音20:15-16'},
+          {text:'因我活著就是基督，我死了就有益處。', ref:'腓立比書1:21'}
+        ],
+        reflect:'這比喻刺中教會裡三種紅眼：宗派的紅眼（誰先到、誰純正）、倫理的紅眼（懷疑主人不公平）、逼迫中的紅眼（覺得自己「勞苦受熱」卻不如別人風光）。你今天心裡的紅眼，藏在哪一種裡？',
+        prayer:'主耶穌，感謝你是那位慷慨的家主，工價從來不是我們配得的，而是你白白的恩典。求你治好我們心裡的功勞帳，使我們因你作好人而不再紅眼。奉你的名，阿們。',
+        quiz:[
+          { q:'馬太福音20:1-16的比喻中，先雇的工人向家主埋怨什麼？',
+            options:['家主把和後來只做一小時的人一樣的工價給了他們','工價太低','葡萄園太小','家主偏心先雇的人'],
+            answer:0,
+            explain:'「我們整天勞苦受熱，那後來的只做了一小時，你竟叫他們和我們一樣嗎？」（太20:12）先雇的工人因家主的慷慨而生出忌妒。' },
+          { q:'家主如何回應先雇工人的埋怨？',
+            options:['取消所有人的工價','我的東西難道不可隨我的意思用嗎？因為我作好人，你就紅了眼嗎？','立刻辭退埋怨的人','要他們重新排隊'],
+            answer:1,
+            explain:'「我的東西難道不可隨我的意思用嗎？因為我作好人，你就紅了眼嗎？」（太20:15）恩典本是主人自由給的，不是工人應得的。' },
+          { q:'腓立比書1:21中，保羅怎樣形容自己活著與死了的意義？',
+            options:['活著就是基督，死了就有益處','活著要享福，死了就沒有意義','活著是負擔，死了才是解脫','活著要成功，死了要留名'],
+            answer:0,
+            explain:'「因我活著就是基督，我死了就有益處。」（腓1:21）這是把生死都獻給基督的宣告。' }
+        ] },
+      { id:'catechumen', title:'主日學與受浸班預備．慕道友栽培對話',
+        summary:'這裡模擬內地教會常見的「慕道友栽培班」場景：一位即將在受浸主日前公開宣信的慕道友，與栽培員一起查考幾項基要真理。你可以選擇扮演「栽培員」，練習怎樣溫柔又清楚地牧養引導；也可以選擇扮演「慕道友」，練習誠實地說出心裡的疑問與掙扎。',
+        verses:[
+          {text:'你們當悔改，各人奉耶穌基督的名受洗，叫你們的罪得赦，就必領受所賜的聖靈。', ref:'使徒行傳2:38'},
+          {text:'豈不知我們這受洗歸入基督耶穌的人，是受洗歸入他的死嗎？……叫我們一舉一動有新生的樣式。', ref:'羅馬書6:3-4'}
+        ],
+        reflect:'如果今天是你受浸的主日，你最想在會眾面前老實說出的一句話會是什麼？',
+        prayer:'主耶穌，感謝你親自呼召每一位願意悔改相信的人。求你在受浸班的預備裡，使栽培員說話溫柔又清楚，使慕道友的心誠實又柔軟，叫受浸不只是一次儀式，而是一生與你同死同復活的起點。奉你的名，阿們。',
+        dialogue:{
+          roles:[
+            { id:'discipler', label:'👤 我來扮演「栽培員」', desc:'練習怎樣用聖經真理，溫柔又清楚地牧養一位即將受浸的慕道友。' },
+            { id:'seeker', label:'🙋 我來扮演「慕道友」', desc:'練習誠實說出心裡的疑問與掙扎，操練用自己的話回應真理。' }
+          ],
+          scenes:[
+            { whenDiscipler:{
+                npcLine:'老師，我知道自己做錯很多事，可是要我完全「悔改」，是不是要先把所有壞習慣都改掉，才可以受浸？',
+                options:[
+                  { text:'受浸不是等你先把自己改好才配得，而是承認自己需要基督，把生命的主權轉向祂；悔改是方向的轉變，不是完美的保證。',
+                    feedback:'很好的引導——把悔改定義為「歸向」而非「完美」，合乎「你們當悔改，各人奉耶穌基督的名受洗」（徒2:38）是呼召轉向，不是要求先自潔。' },
+                  { text:'你先努力改好一段時間，我們過幾個月再看看要不要受浸。',
+                    feedback:'這樣的回應容易把受浸變成「行為考核」，恐怕叫慕道友誤以為救恩靠自己的努力，而不是本乎恩、也因著信（弗2:8-9）。' },
+                  { text:'只要你心裡相信就好，外面做什麼不重要。',
+                    feedback:'這個回應保住了因信稱義，卻可能忽略真信心必然結出悔改的果子（太3:8）；需要把因信稱義與真實悔改一起講清楚。' }
+                ] },
+              whenSeeker:{
+                npcLine:'受浸不是靠你先把壞習慣都改乾淨才配得的獎賞，而是公開承認：「我把生命的主權交給耶穌基督。」你聽到這裡，心裡老實的感覺是什麼？',
+                options:[
+                  { text:'老師，說實話，我還是很怕自己受浸以後又故態復萌，那樣是不是就「白受」了？',
+                    feedback:'很誠實的問題！這正好把重點放回「我今天願不願意繼續倚靠基督」，而不是「我以後絕不失敗」。' },
+                  { text:'太好了，那我現在就完全沒有任何掙扎了。',
+                    feedback:'受浸班很怕慕道友只說「標準答案」；可以鼓勵自己多想一句「那如果我以後失敗怎麼辦」，讓真實的掙扎浮上來。' },
+                  { text:'老師，那是不是代表我以後犯罪都沒關係？',
+                    feedback:'這是個值得澄清的誤解——恩典不是放縱的執照（羅6:1-2），可以趁機請教栽培員進一步說明。' }
+                ] } },
+            { whenDiscipler:{
+                npcLine:'受浸是不是就代表「畢業」了？以後我是不是就不用再這麼常來聚會、學這麼多聖經了？',
+                options:[
+                  { text:'受浸不是畢業典禮，而是正式加入基督身體——教會——的開始；接下來是一輩子與弟兄姊妹彼此相顧、一起在真道上長大成人（弗4:15-16），並非結束，而是起點。',
+                    feedback:'很好的回答，把受浸定位為「進入」而非「畢業」，符合「不可停止聚會」（來10:25）的教導。' },
+                  { text:'對啊，受浸完你就正式是基督徒了，以後聚不聚會都無所謂，靠自己讀經就好。',
+                    feedback:'這個回答容易讓人脫離教會群體生活，忽略聖經一貫強調「彼此」的功課需要在教會群體中操練。' },
+                  { text:'受浸完你責任更大了，以後犯錯會被教會處分，要更加小心。',
+                    feedback:'把教會描寫成監督與處分的機構，容易叫慕道友對受浸產生恐懼，忽略了教會首要是彼此相愛、互相扶持的大家庭。' }
+                ] },
+              whenSeeker:{
+                npcLine:'受浸不是畢業典禮，而是正式加入基督身體——教會——的開始；接下來是一輩子與弟兄姊妹彼此相顧、一起在真道上長大成人（弗4:15-16）。聽到「這是起點不是終點」，你心裡的感覺是輕鬆，還是有點沉重？',
+                options:[
+                  { text:'老師，說實話，想到要一直委身在教會、參加聚會、服事，我心裡會怕自己做不到、半途而廢。',
+                    feedback:'很真實的心情——教會生活不是靠自己一個人硬撐，乃是弟兄姊妹彼此扶持、一起在恩典中前進的旅程。' },
+                  { text:'很輕鬆啊，反正教會又不會勉強我做什麼。',
+                    feedback:'可以更清楚地說明：委身教會確實會帶來實際的責任（聚會、服事、彼此相顧），不是毫無成本的選項。' },
+                  { text:'有點沉重，因為我知道自己個性比較孤僻，不太習慣跟人來往。',
+                    feedback:'很誠實的自我認識，正好可以思想：教會生活不是要馬上變成外向的人，而是學習在基督裡與人建立真實而不完美的關係。' }
+                ] } }
+          ]
+        } },
+      { id:'unity-stele', title:'合一與守望代求．經文碑前的同心禱告', isUnity:true, isStele:true,
+        summary:'這座經文碑刻著使徒保羅的勸勉：要為在位的、為萬人、為神的僕人懇切代求。你可以在此按下「同心代求」——當足夠多正在使用這座禱告園的肢體，在相近的時間裡一同按下祈禱鍵，碑文就會發出金光，象徵眾聖徒的祈禱如香陳列在神面前。今天是主日，也是世界清潔日、韓國殉道者紀念日——正是需要在恩典與忠心中同心代求的時刻。',
+        verses:[
+          {text:'我勸你第一要為萬人懇求、禱告、代求、祝謝；為君王和一切在位的，也該如此，使我們可以敬虔、端正、平安無事的度日。', ref:'提摩太前書2:1-2'},
+          {text:'願我的禱告如香陳列在你面前！願我舉手祈求，如獻晚祭！', ref:'詩篇141:2'},
+          {text:'那香的煙和眾聖徒的祈禱，從天使的手中一同升到神面前。', ref:'啟示錄8:4'}
+        ],
+        reflect:'你今天願意為哪一位「在位的、為神的僕人」具體地舉手代求？不是抽象地「為國家禱告」，而是叫得出至少一個位置、一個名字。',
+        prayer:'聽禱告的主，我們為一切在位的、為各地牧養群羊的神的僕人、也為許許多多此刻只求平安度日的百姓，向你懇切祈求。願我們微小的祈禱，如同香一般升到你面前；願眾聖徒分散在各地的呼求，在你手中聚集成一股不能被任何權勢消音的馨香。奉耶穌基督的名，阿們。' }
+    ]
+  }
+];
+
+
+/* =========================================================
+   引擎 ENGINE
+   ========================================================= */
+let scene, camera, renderer, clock;
+let player, playerPos = new THREE.Vector3(0, 0, 11);
+let lastDir = new THREE.Vector3(0, 0, -1);
+let currentYaw = Math.PI;
+let currentLookAt = new THREE.Vector3(0, 1.6, 0);
+let stations = [];
+let nearestStation = null;
+const INTERACT_RADIUS = 4.3;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let profile = { name: '', color: '#E8A33D' };
+let lastGreetingTs = Date.now();
+
+/* ---------- 合一與守望代求：同心禱告的「金光」狀態 ----------
+   unityGlowUntil 是本機知道的「金光應持續到什麼時候」（毫秒時間戳）；
+   由 pressUnityPrayer()（自己按下）或 pollUnityGlow()（定時向共享儲存
+   詢問，讓別人按下時，這台裝置也能跟著看到金光）兩者共同更新。 */
+let unityGlowUntil = 0;
+const UNITY_WINDOW_MS = 90 * 1000;   // 多久之內按下算「同一波」同心代求
+const UNITY_THRESHOLD = 3;           // 這一波內累積達到幾次按鍵，觸發金光
+const UNITY_GLOW_DURATION_MS = 60 * 1000; // 金光持續多久
+
+const keysDown = {};
+let stickActive = false, stickVec = { x: 0, y: 0 }, stickCenter = null;
+let floatingStick = false;
+let sceneInitialized = false;
+
+/* ---------- 儲存層（Storage） ----------
+   本禱告園原本假設會跑在 Claude 的 Artifact 環境裡，那裡會自動注入
+   window.storage 這個共享資料庫 API。現在這一版改為部署在一般的雲端
+   平台上（例如 Cloudflare Worker、Netlify 等），所以這一層改成：
+   1) 若偵測到真正的 window.storage（在 Claude Artifact 裡開啟時）→
+      直接使用，不需要下面的網路層。
+   2) 否則，「共享」（shared=true）的資料——代禱牆、燭光數、腳蹤數、
+      智慧果實、問安、同心代求——一律用「絕對網址」透過 fetch 呼叫
+      本禱告園同一個網域下的後端服務（見下面 KV_API_BASE），讀寫共享
+      KV。因為是絕對網址，這代表：即使您把這份 HTML 另存成一般檔案，
+      放到自己的網站、甚至只是雙擊在本機打開，只要瀏覽器連得到這個
+      Worker 的網域（在中國大陸境內可能需要能連到境外網路的方式），
+      仍然可以讀寫「同一份」共享資料，與所有連得上的弟兄姊妹即時同步。
+   3) 若一時連不上這個 Worker（沒有對應的連線方式、逾時、離線等），
+      「共享」的讀寫會安靜地退回這台裝置的 localStorage 暫存：不會跳出
+      錯誤訊息，蠟燭、留言、代求都還是能正常寫入、重新整理也不會消失，
+      只是這段時間寫下的內容，暫時只有自己看得到，不會出現在其他人的
+      裝置上；等之後連線恢復、重新整理頁面時，會改讀到伺服器上「所有人」
+      的最新資料。
+   4) 「個人」資料（shared=false，目前只有 profile：你自己的暱稱與燈籠
+      顏色）一律留在這台裝置的 localStorage——那本來就只需要「這台裝置
+      記得我是誰」，不必也不應該跨裝置同步。
+   5) 若連 localStorage 都不能用（例如某些隱私模式），退到純記憶體，
+      至少這一次遊玩期間所有功能都還能正常運作。
+   誠實的限制：連線正常時能多快看到彼此的最新資料，要看實際後端而定
+   （例如 Cloudflare KV 是最終一致性，寫入後可能要數十秒才傳播到全球
+   節點；Netlify Blobs 用 strong consistency 時，寫入後幾乎立刻就能
+   讀到最新值）。若連線不通而退回本機暫存，那份資料在重新連上之前，
+   本來就無法被其他人看到——這不是程式錯誤，而是離線儲存的本質。
+*/
+// 這個網站自己的後端 API（相對路徑：前端網頁與 Netlify Functions 部署在同一個網域，
+// 所以直接用 /api/kv 就會打到同一個 Netlify 網站的 Functions。若把這份 HTML 另存
+// 到別的、沒有這組 Functions 的網站，/api/kv 會連不到，畫面會自動退回本機模式
+// （見下方 Storage 的離線容錯設計），不會整個壞掉，只是變成不共享。
+const DAY_KEY = 'sep20'; // 這一頁（今日話題室）專屬的共享資料前綴，讓同一站台下的每一天彼此獨立
+const KV_API_BASE = '/api/kv';
+const KV_FETCH_TIMEOUT_MS = 6000; // 連不上時，最多等這麼久就放棄、改走本機暫存，避免卡住UI
+
+const Storage = (() => {
+  const hasArtifactStorage = () => !!(window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function');
+  let localStorageOK = false;
+  try {
+    const probeKey = '__swc_probe__';
+    localStorage.setItem(probeKey, '1');
+    localStorage.removeItem(probeKey);
+    localStorageOK = true;
+  } catch (e) { localStorageOK = false; }
+  const mem = new Map();
+  const lsKey = (key) => 'swc:local:' + key; // 個人資料（shared=false）
+  const fbKey = (key) => 'swc:sharedFallback:' + DAY_KEY + ':' + key; // 共享資料連不上遠端時的本機暫存（依日期分開暫存）
+
+  // 目前跟遠端伺服器的連線狀態，UI可以讀這個來顯示小提示，不會拿來跳錯誤視窗
+  const status = { shared: 'unknown' }; // 'online' | 'offline' | 'unknown'
+
+  function fetchWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), KV_FETCH_TIMEOUT_MS);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  }
+  function readFallback(key) {
+    if (localStorageOK) {
+      const raw = localStorage.getItem(fbKey(key));
+      return raw !== null ? { key, value: raw, shared: true, offline: true } : null;
+    }
+    return mem.has(fbKey(key)) ? { key, value: mem.get(fbKey(key)), shared: true, offline: true } : null;
+  }
+  function writeFallback(key, value) {
+    if (localStorageOK) { localStorage.setItem(fbKey(key), value); }
+    else { mem.set(fbKey(key), value); }
+  }
+
+  async function kvGet(key) {
+    const res = await fetchWithTimeout(KV_API_BASE + '/get?key=' + encodeURIComponent(DAY_KEY + ':' + key), { method: 'GET' });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error('KV get failed: ' + res.status);
+    return res.json(); // { key, value, shared:true } 或 null
+  }
+  async function kvSet(key, value) {
+    const res = await fetchWithTimeout(KV_API_BASE + '/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: DAY_KEY + ':' + key, value })
+    });
+    if (!res.ok) throw new Error('KV set failed: ' + res.status);
+    return res.json(); // { key, value, shared:true }
+  }
+
+  async function get(key, shared) {
+    if (hasArtifactStorage()) {
+      try { return await window.storage.get(key, shared); }
+      catch (e) { return null; }
+    }
+    if (shared) {
+      try {
+        const remote = await kvGet(key);
+        status.shared = 'online';
+        // 連得上遠端時，用遠端資料為準（若剛好還沒有任何人寫過這個key，remote會是null）
+        return remote !== null ? remote : readFallback(key);
+      } catch (e) {
+        status.shared = 'offline';
+        return readFallback(key); // 連不上時，安靜地改讀本機暫存，不噴錯誤
+      }
+    }
+    if (localStorageOK) {
+      const raw = localStorage.getItem(lsKey(key));
+      return raw !== null ? { key, value: raw, shared: false } : null;
+    }
+    return mem.has(lsKey(key)) ? { key, value: mem.get(lsKey(key)), shared: false } : null;
+  }
+  async function set(key, value, shared) {
+    if (hasArtifactStorage()) {
+      return await window.storage.set(key, value, shared);
+    }
+    if (shared) {
+      try {
+        const result = await kvSet(key, value);
+        status.shared = 'online';
+        writeFallback(key, value); // 同步一份到本機，避免下次離線時讀到更舊的資料
+        return result;
+      } catch (e) {
+        status.shared = 'offline';
+        writeFallback(key, value); // 優雅退回本機暫存：不丟出錯誤，讓UI當作「已送出」
+        return { key, value, shared: true, offline: true };
+      }
+    }
+    if (localStorageOK) {
+      localStorage.setItem(lsKey(key), value);
+      return { key, value, shared: false };
+    }
+    mem.set(lsKey(key), value);
+    return { key, value, shared: false };
+  }
+  return {
+    get, set, status,
+    mode: hasArtifactStorage() ? 'artifact' : (localStorageOK ? 'local+kv' : 'memory+kv')
+  };
+})();
+
+/* ---------- 音效（AudioFX） ----------
+   用 Web Audio API 即時合成的短音效，不需要另外載入任何音樂／音效檔案，
+   離線或放到任何網站都能運作。瀏覽器規定 AudioContext 一定要在使用者
+   有實際點擊或觸摸之後才能啟動，所以 unlock() 會在第一次按鈕互動時呼叫。 */
+const AudioFX = (() => {
+  let ctx = null;
+  let enabled = true;
+  try { enabled = localStorage.getItem('swc:sfx') !== 'off'; } catch (e) { /* 忽略 */ }
+  function ensureCtx() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) ctx = new AC();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  function tone(freq, duration, type, gain, delay, glideTo) {
+    if (!enabled) return;
+    const c = ensureCtx();
+    if (!c) return;
+    const t0 = c.currentTime + (delay || 0);
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t0 + duration);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain || 0.12, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(t0); osc.stop(t0 + duration + 0.03);
+  }
+  return {
+    unlock() { ensureCtx(); },
+    isEnabled: () => enabled,
+    setEnabled(v) {
+      enabled = v;
+      try { localStorage.setItem('swc:sfx', v ? 'on' : 'off'); } catch (e) { /* 忽略 */ }
+      if (v) ensureCtx();
+    },
+    click() { tone(640, 0.06, 'triangle', 0.10); },
+    open() { tone(420, 0.16, 'sine', 0.12, 0, 640); },
+    close() { tone(520, 0.12, 'sine', 0.09, 0, 340); },
+    chime() { tone(523.25, 0.2, 'sine', 0.13); tone(659.25, 0.26, 'sine', 0.11, 0.06); tone(783.99, 0.32, 'sine', 0.09, 0.12); },
+    candle() { tone(300, 0.5, 'sine', 0.11, 0, 520); tone(450, 0.55, 'triangle', 0.05, 0.08); },
+    greeting() { tone(740, 0.18, 'sine', 0.09); tone(988, 0.28, 'sine', 0.07, 0.1); },
+    footstep() { tone(120 + Math.random() * 18, 0.05, 'sine', 0.035); },
+    hint() { tone(880, 0.08, 'sine', 0.06); },
+    error() { tone(220, 0.2, 'sawtooth', 0.08, 0, 150); }
+  };
+})();
+
+/* ---------- 小工具 ---------- */
+function lerpAngle(a, b, t) {
+  let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  return a + diff * t;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function makeTextSprite(text, color, fontSize) {
+  fontSize = fontSize || 30;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const font = `700 ${fontSize}px "Noto Sans TC", sans-serif`;
+  ctx.font = font;
+  const pad = 18;
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+  const h = fontSize + pad * 1.6;
+  canvas.width = w; canvas.height = h;
+  ctx.font = font;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(10,16,36,0.6)';
+  roundRectPath(ctx, 2, 2, w - 4, h - 4, 12);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillText(text, w / 2, h / 2 + 1);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  const scale = 0.027;
+  sprite.scale.set(w * scale, h * scale, 1);
+  return sprite;
+}
+
+/* ---------- 場景建構 ---------- */
+function buildSky() {
+  const geo = new THREE.SphereGeometry(300, 24, 16);
+  const top = new THREE.Color(0x0a1230);
+  const bottom = new THREE.Color(0x4a3a63);
+  const pos = geo.attributes.position;
+  const colors = [];
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const t = THREE.MathUtils.clamp((y + 60) / 220, 0, 1);
+    const c = bottom.clone().lerp(top, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false });
+  scene.add(new THREE.Mesh(geo, mat));
+}
+function buildStars() {
+  const count = 380;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 140 + Math.random() * 130;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(THREE.MathUtils.lerp(0.05, 0.85, Math.random()));
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) + 25;
+    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xF3ECD9, size: 1.15, sizeAttenuation: true, transparent: true, opacity: 0.85, fog: false });
+  scene.add(new THREE.Points(geo, mat));
+}
+function buildGround() {
+  const geo = new THREE.CircleGeometry(60, 56);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x453f31, roughness: 0.95, metalness: 0.02 });
+  const ground = new THREE.Mesh(geo, mat);
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  const ringGeo = new THREE.TorusGeometry(9.6, 0.1, 6, 48);
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xC9A227, emissive: 0xC9A227, emissiveIntensity: 0.5 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.02;
+  scene.add(ring);
+
+  const outerGeo = new THREE.TorusGeometry(58, 0.08, 6, 64);
+  const outerMat = new THREE.MeshStandardMaterial({ color: 0x8B7E63, emissive: 0x8B7E63, emissiveIntensity: 0.25 });
+  const outer = new THREE.Mesh(outerGeo, outerMat);
+  outer.rotation.x = Math.PI / 2; outer.position.y = 0.02;
+  scene.add(outer);
+}
+function buildScenery() {
+  for (let i = 0; i < 24; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 16 + Math.random() * 38;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    let tooClose = false;
+    for (const zn of ZONES) { if (Math.hypot(x - zn.pos.x, z - zn.pos.z) < 15) { tooClose = true; break; } }
+    if (Math.hypot(x, z) < 12) tooClose = true;
+    if (tooClose) continue;
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.17, 1.1, 6),
+      new THREE.MeshStandardMaterial({ color: 0x4A3826, roughness: 0.9 })
+    );
+    trunk.position.set(x, 0.55, z);
+    const top = new THREE.Mesh(
+      new THREE.ConeGeometry(0.75, 1.7, 7),
+      new THREE.MeshStandardMaterial({ color: 0x2F4A3B, roughness: 0.9 })
+    );
+    top.position.set(x, 1.75, z);
+    scene.add(trunk); scene.add(top);
+  }
+}
+function pushStation(entry) { stations.push(entry); }
+
+function buildMemorial() {
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0x362E22 }));
+  base.position.y = 0.3; group.add(base);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 4.2, 6), new THREE.MeshStandardMaterial({ color: 0x6B6357, roughness: 0.85 }));
+  shaft.position.y = 2.7; group.add(shaft);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.1, 6), new THREE.MeshStandardMaterial({ color: 0xC9A227, emissive: 0xC9A227, emissiveIntensity: 0.55 }));
+  cap.position.y = 5.35; group.add(cap);
+  const light = new THREE.PointLight(0xE8A33D, 1.2, 10, 2);
+  light.position.y = 5.4; group.add(light);
+  const label = makeTextSprite('📜 紀念碑', '#F3ECD9', 28);
+  label.position.y = 6.5; group.add(label);
+  group.position.set(0, 0, -7.5);
+  scene.add(group);
+  pushStation({
+    id: 'memorial', data: MEMORIAL,
+    zone: { icon: '📜', name: '紀念碑', glowHex: '#C9A227' },
+    worldPos: new THREE.Vector3(0, 0, -7.5), orb: cap, light
+  });
+}
+function buildAltar() {
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x3B4A3E, roughness: 0.9 }));
+  base.position.y = 0.25; group.add(base);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.0, 6), new THREE.MeshStandardMaterial({ color: 0x6B6357 }));
+    post.position.set(Math.cos(a) * 1.0, 1.0, Math.sin(a) * 0.7);
+    group.add(post);
+  }
+  const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), new THREE.MeshStandardMaterial({ color: 0x8FBF8C, emissive: 0x8FBF8C, emissiveIntensity: 1.1, roughness: 0.4 }));
+  orb.position.y = 1.7; group.add(orb);
+  const light = new THREE.PointLight(0x8FBF8C, 1.2, 10, 2);
+  light.position.y = 1.8; group.add(light);
+  const label = makeTextSprite('🙏 同心代禱壇', '#F3ECD9', 28);
+  label.position.y = 3.0; group.add(label);
+  group.position.set(0, 0, 0);
+  scene.add(group);
+  pushStation({
+    id: 'altar', data: ALTAR,
+    zone: { icon: '🙏', name: '同心代禱壇', glowHex: '#8FBF8C' },
+    worldPos: new THREE.Vector3(0, 0, 0), orb, light
+  });
+}
+function buildPavilion() {
+  const group = new THREE.Group();
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.3, 10), new THREE.MeshStandardMaterial({ color: 0x453f31 }));
+  floor.position.y = 0.15; group.add(floor);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x8B7E63 }));
+    p.position.set(Math.cos(a) * 1.35, 1.5, Math.sin(a) * 1.35);
+    group.add(p);
+  }
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.3, 6), new THREE.MeshStandardMaterial({ color: 0x5B3A62, emissive: 0x5B3A62, emissiveIntensity: 0.3 }));
+  roof.position.y = 3.35; group.add(roof);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), new THREE.MeshStandardMaterial({ color: 0xF4C15C, emissive: 0xF4C15C, emissiveIntensity: 1.4 }));
+  flame.position.y = 1.9; group.add(flame);
+  const light = new THREE.PointLight(0xF4C15C, 1.4, 11, 2);
+  light.position.y = 2.0; group.add(light);
+  const label = makeTextSprite('🕯️ 祈禱亭', '#F3ECD9', 28);
+  label.position.y = 4.5; group.add(label);
+  group.position.set(0, 0, 7.5);
+  scene.add(group);
+  pushStation({
+    id: 'pavilion', data: PAVILION,
+    zone: { icon: '🕯️', name: '祈禱亭', glowHex: '#F4C15C' },
+    worldPos: new THREE.Vector3(0, 0, 7.5), orb: flame, light, isFlame: true
+  });
+}
+function buildZonePlatform(zone) {
+  const plat = new THREE.Mesh(
+    new THREE.CylinderGeometry(13, 13.5, 0.4, 32),
+    new THREE.MeshStandardMaterial({ color: zone.colorHex, roughness: 0.85, metalness: 0.08 })
+  );
+  plat.position.set(zone.pos.x, 0.2, zone.pos.z);
+  scene.add(plat);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(13.3, 0.14, 8, 48),
+    new THREE.MeshStandardMaterial({ color: zone.glowHex, emissive: zone.glowHex, emissiveIntensity: 0.6 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(zone.pos.x, 0.42, zone.pos.z);
+  scene.add(ring);
+
+  // 旗杆（光柱）原本高達14，加上更高的名稱標籤，玩家靠近時常常抬頭也看不到
+  // 大類名稱；縮短光柱、把標籤降到光柱頂端附近，讓名稱維持在視野範圍內。
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.15, 6.5, 8),
+    new THREE.MeshBasicMaterial({ color: zone.glowHex, transparent: true, opacity: 0.35 })
+  );
+  beacon.position.set(zone.pos.x, 3.25, zone.pos.z);
+  scene.add(beacon);
+
+  const label = makeTextSprite(`${zone.icon} ${zone.name}`, zone.glowHex, 40);
+  label.position.set(zone.pos.x, 7.6, zone.pos.z);
+  scene.add(label);
+}
+function buildStationMarker(zone, station, index, total) {
+  const angle = (index / total) * Math.PI * 2;
+  const radius = 10.5; // 原本8.6讓站點擠在一起，加大半徑增加彼此的間距
+  const x = zone.pos.x + Math.cos(angle) * radius;
+  const z = zone.pos.z + Math.sin(angle) * radius;
+  if (station.isStele) {
+    // 合一與守望代求：做成經文碑（石座＋石板）的造型，而不是一般的柱燈站點
+    const group = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.0, 0.45, 10), new THREE.MeshStandardMaterial({ color: 0x362E22, roughness: 0.9 }));
+    base.position.y = 0.22; group.add(base);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 0.34), new THREE.MeshStandardMaterial({ color: 0x5B5347, roughness: 0.82 }));
+    slab.position.y = 1.7; group.add(slab);
+    const panel = new THREE.Mesh(
+      new THREE.BoxGeometry(1.08, 1.7, 0.05),
+      new THREE.MeshStandardMaterial({ color: zone.glowHex, emissive: zone.glowHex, emissiveIntensity: 0.9, roughness: 0.4 })
+    );
+    panel.position.set(0, 1.75, 0.2); group.add(panel);
+    const light = new THREE.PointLight(zone.glowHex, 1.05, 9, 2);
+    light.position.set(0, 1.9, 0.9); group.add(light);
+    const label = makeTextSprite(station.title.length > 16 ? station.title.slice(0, 15) + '…' : station.title, '#F3ECD9', 26);
+    label.position.y = 3.55; group.add(label);
+    group.position.set(x, 0.4, z);
+    scene.add(group);
+    pushStation({ id: station.id, data: station, zone, worldPos: new THREE.Vector3(x, 0, z), orb: panel, light, isStele: true, baseGlowHex: zone.glowHex });
+    return;
+  }
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 0.5, 10), new THREE.MeshStandardMaterial({ color: 0x362E22, roughness: 0.9 }));
+  base.position.y = 0.25; group.add(base);
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x453f31 }));
+  pillar.position.y = 1.35; group.add(pillar);
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.42, 14, 12),
+    new THREE.MeshStandardMaterial({ color: zone.glowHex, emissive: zone.glowHex, emissiveIntensity: 1.1, roughness: 0.4 })
+  );
+  orb.position.y = 2.7; group.add(orb);
+  const light = new THREE.PointLight(zone.glowHex, 1.05, 9, 2);
+  light.position.y = 2.7; group.add(light);
+  const label = makeTextSprite(station.title.length > 16 ? station.title.slice(0, 15) + '…' : station.title, '#F3ECD9', 26);
+  label.position.y = 3.7; group.add(label);
+  group.position.set(x, 0.4, z);
+  scene.add(group);
+  pushStation({ id: station.id, data: station, zone, worldPos: new THREE.Vector3(x, 0, z), orb, light });
+}
+function buildPlayer(p) {
+  const group = new THREE.Group();
+  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.5, 10), new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.7 }));
+  robe.position.y = 0.95; group.add(robe);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 12), new THREE.MeshStandardMaterial({ color: 0xE7C9A9, roughness: 0.6 }));
+  head.position.y = 1.95; group.add(head);
+  const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshStandardMaterial({ color: 0xF4C15C, emissive: 0xF4C15C, emissiveIntensity: 1.3 }));
+  lantern.position.set(0.55, 1.0, 0.15); group.add(lantern);
+  const lanternLight = new THREE.PointLight(0xF4C15C, 0.9, 6, 2);
+  lanternLight.position.copy(lantern.position); group.add(lanternLight);
+  const nameTag = makeTextSprite(p.name || '匿名肢體', p.color, 24);
+  nameTag.position.y = 2.55; group.add(nameTag);
+  scene.add(group);
+  return group;
+}
+
+/* ---------- 動態 ---------- */
+const _camForward = new THREE.Vector3();
+const _camRight = new THREE.Vector3();
+const _moveDir = new THREE.Vector3();
+let footstepTimer = 0;
+function updateMovement(dt) {
+  const speed = 9;
+  const ix = stickActive ? stickVec.x : keyboardX();
+  const iy = stickActive ? stickVec.y : keyboardY();
+  const mag = Math.min(1, Math.hypot(ix, iy));
+  if (mag > 0.06) {
+    // 以「攝影機目前面向」為基準來換算方向，而不是固定的世界座標。
+    // 這樣搖桿往螢幕上看到的方向推，角色就會往那個方向走——
+    // 在手機上要精準地朝著某個目標（例如某個發光站點）移動會直覺很多。
+    _camForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    _camForward.y = 0;
+    if (_camForward.lengthSq() < 1e-6) _camForward.set(0, 0, -1); else _camForward.normalize();
+    _camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    _camRight.y = 0;
+    if (_camRight.lengthSq() < 1e-6) _camRight.set(1, 0, 0); else _camRight.normalize();
+    _moveDir.set(0, 0, 0).addScaledVector(_camRight, ix).addScaledVector(_camForward, iy);
+    if (_moveDir.lengthSq() < 1e-6) _moveDir.set(0, 0, -1); else _moveDir.normalize();
+    lastDir.copy(_moveDir);
+    playerPos.addScaledVector(_moveDir, speed * mag * dt);
+    const targetYaw = Math.atan2(_moveDir.x, _moveDir.z);
+    currentYaw = lerpAngle(currentYaw, targetYaw, Math.min(1, 10 * dt));
+    footstepTimer -= dt;
+    if (footstepTimer <= 0) { AudioFX.footstep(); footstepTimer = 0.36; }
+  } else {
+    footstepTimer = 0;
+  }
+  const R = 57, d = Math.hypot(playerPos.x, playerPos.z);
+  if (d > R) { const s = R / d; playerPos.x *= s; playerPos.z *= s; }
+  player.position.set(playerPos.x, 0, playerPos.z);
+  player.rotation.y = currentYaw;
+}
+function keyboardX() { return (keysDown['d'] || keysDown['arrowright'] ? 1 : 0) - (keysDown['a'] || keysDown['arrowleft'] ? 1 : 0); }
+function keyboardY() { return (keysDown['w'] || keysDown['arrowup'] ? 1 : 0) - (keysDown['s'] || keysDown['arrowdown'] ? 1 : 0); }
+
+function updateCamera(dt) {
+  const dist = 12, height = 6.4;
+  const camTarget = new THREE.Vector3(playerPos.x - lastDir.x * dist, height, playerPos.z - lastDir.z * dist);
+  camera.position.lerp(camTarget, Math.min(1, 4 * dt));
+  const lookTarget = new THREE.Vector3(playerPos.x + lastDir.x * 3, 1.5, playerPos.z + lastDir.z * 3);
+  currentLookAt.lerp(lookTarget, Math.min(1, 6 * dt));
+  camera.lookAt(currentLookAt);
+}
+let lastHintedId = null;
+function updateNearest() {
+  let best = null, bestDist = Infinity;
+  for (const s of stations) {
+    const dist = Math.hypot(s.worldPos.x - playerPos.x, s.worldPos.z - playerPos.z);
+    if (dist < bestDist) { bestDist = dist; best = s; }
+  }
+  if (best && bestDist < INTERACT_RADIUS) {
+    nearestStation = best;
+    if (lastHintedId !== best.id) { AudioFX.hint(); lastHintedId = best.id; }
+    showHint(best);
+  } else {
+    nearestStation = null;
+    lastHintedId = null;
+    hideHint();
+  }
+}
+function showHint(s) {
+  const el = document.getElementById('hint-banner');
+  el.textContent = `${s.zone.icon} ${s.data.title} · 點擊右下角「互動」`;
+  el.classList.add('show');
+  document.getElementById('interact-btn').classList.add('active');
+}
+function hideHint() {
+  document.getElementById('hint-banner').classList.remove('show');
+  document.getElementById('interact-btn').classList.remove('active');
+}
+
+let lastT = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  updateMovement(dt);
+  updateCamera(dt);
+  updateNearest();
+  const unityGlowing = Date.now() < unityGlowUntil;
+  for (const s of stations) {
+    if (s.orb) {
+      const pulse = reduceMotion ? 1.0 : 0.9 + Math.sin(t * 2 + s.worldPos.x + s.worldPos.z) * 0.25;
+      if (s.isStele && unityGlowing) {
+        // 眾聖徒的祈禱如香陳列：足夠多人同心代求時，碑文發出金光
+        const goldPulse = reduceMotion ? 1.8 : 1.6 + Math.sin(t * 5) * 0.5;
+        if (s.orb.material) { s.orb.material.emissiveIntensity = goldPulse; s.orb.material.emissive.set('#F4C15C'); s.orb.material.color.set('#F4C15C'); }
+        if (s.light) { s.light.intensity = 2.2 + (reduceMotion ? 0 : Math.sin(t * 5) * 0.4); s.light.color.set('#F4C15C'); }
+      } else {
+        if (s.orb.material && 'emissiveIntensity' in s.orb.material) s.orb.material.emissiveIntensity = s.isFlame ? pulse * 1.3 : pulse;
+        if (s.isStele && s.baseGlowHex) { s.orb.material.emissive.set(s.baseGlowHex); s.orb.material.color.set(s.baseGlowHex); }
+        if (s.light) { s.light.intensity = 0.9 + pulse * 0.3; if (s.isStele && s.baseGlowHex) s.light.color.set(s.baseGlowHex); }
+        if (s.isFlame && !reduceMotion) s.orb.scale.setScalar(1 + Math.sin(t * 6) * 0.08);
+      }
+    }
+  }
+  renderer.render(scene, camera);
+}
+
+/* ---------- 初始化場景 ---------- */
+function initScene() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 500);
+  camera.position.set(0, 6.5, 23);
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+  clock = new THREE.Clock();
+
+  buildSky();
+  buildStars();
+  scene.fog = new THREE.FogExp2(0x1b2340, 0.0105);
+  scene.add(new THREE.AmbientLight(0x8892c0, 0.6));
+  const moon = new THREE.DirectionalLight(0xcdd6f0, 0.55);
+  moon.position.set(-40, 60, -20);
+  scene.add(moon);
+
+  buildGround();
+  buildScenery();
+  buildMemorial();
+  buildAltar();
+  buildPavilion();
+  ZONES.forEach(buildZonePlatform);
+  ZONES.forEach(zone => zone.stations.forEach((st, idx) => buildStationMarker(zone, st, idx, zone.stations.length)));
+
+  player = buildPlayer(profile);
+  player.position.copy(playerPos);
+
+  window.addEventListener('resize', onResize);
+  animate();
+  loadTopStats();
+  pollUnityGlow();
+  setInterval(loadTopStats, 25000);
+  setInterval(pollGreetings, 17000);
+  setInterval(pollUnityGlow, 8000);
+  showToast('拖曳畫面任何地方即可行走（不用精準摸到左下角那顆搖桿）；靠近發光的站點後，點擊右下角「互動」即可閱讀、代禱與留言。');
+}
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* ---------- 輸入：搖桿（可在畫面任何地方觸摸拖曳）與鍵盤 ---------- */
+const stickBase = document.getElementById('stick-base');
+const stickKnob = document.getElementById('stick-knob');
+const moveLayer = document.getElementById('move-layer');
+const STICK_MAXR = 44;
+let activeTouchId = null;
+
+function inRect(x, y, rect) { return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }
+
+// 開始一次拖曳。如果是直接摸到左下角原本那顆搖桿，就沿用它原本的位置；
+// 如果是摸畫面上的任何其他地方，搖桿會立刻「浮」到手指所在的位置，
+// 讓使用者不需要精準地摸到一個很小的圓圈，滑到哪、搖桿就出現在哪。
+function stickDown(clientX, clientY) {
+  stickActive = true;
+  const baseRect = stickBase.getBoundingClientRect();
+  if (!inRect(clientX, clientY, baseRect)) {
+    floatingStick = true;
+    stickBase.classList.remove('returning');
+    stickBase.classList.add('floating');
+    const half = baseRect.width / 2;
+    stickBase.style.left = (clientX - half) + 'px';
+    stickBase.style.top = (clientY - half) + 'px';
+    stickBase.style.right = 'auto';
+    stickBase.style.bottom = 'auto';
+  }
+  const rect = stickBase.getBoundingClientRect();
+  stickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  stickMove(clientX, clientY);
+}
+function stickMove(clientX, clientY) {
+  if (!stickActive) return;
+  let dx = clientX - stickCenter.x;
+  let dy = clientY - stickCenter.y;
+  const dist = Math.min(STICK_MAXR, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx);
+  dx = Math.cos(ang) * dist; dy = Math.sin(ang) * dist;
+  stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  stickVec = { x: dx / STICK_MAXR, y: -dy / STICK_MAXR };
+}
+function stickUp() {
+  stickActive = false; stickVec = { x: 0, y: 0 };
+  activeTouchId = null;
+  stickKnob.style.transform = 'translate(0,0)';
+  if (floatingStick) {
+    stickBase.classList.add('returning');
+    stickBase.style.left = ''; stickBase.style.top = '';
+    stickBase.style.right = ''; stickBase.style.bottom = '';
+    stickBase.classList.remove('floating');
+    floatingStick = false;
+  }
+}
+moveLayer.addEventListener('touchstart', e => {
+  if (activeTouchId !== null) return; // 已經有一根手指在控制搖桿，忽略其他手指
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  activeTouchId = t.identifier;
+  stickDown(t.clientX, t.clientY);
+}, { passive: false });
+moveLayer.addEventListener('touchmove', e => {
+  if (activeTouchId === null) return;
+  const t = Array.from(e.changedTouches).find(tt => tt.identifier === activeTouchId);
+  if (!t) return;
+  e.preventDefault();
+  stickMove(t.clientX, t.clientY);
+}, { passive: false });
+function endTouch(e) {
+  if (activeTouchId === null) return;
+  const t = Array.from(e.changedTouches).find(tt => tt.identifier === activeTouchId);
+  if (!t) return;
+  stickUp();
+}
+moveLayer.addEventListener('touchend', endTouch, { passive: true });
+moveLayer.addEventListener('touchcancel', endTouch, { passive: true });
+moveLayer.addEventListener('mousedown', e => {
+  stickDown(e.clientX, e.clientY);
+  const mm = ev => stickMove(ev.clientX, ev.clientY);
+  const mu = () => { stickUp(); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
+  window.addEventListener('mousemove', mm);
+  window.addEventListener('mouseup', mu);
+});
+window.addEventListener('keydown', e => {
+  keysDown[e.key.toLowerCase()] = true;
+  if ((e.key === 'e' || e.key === 'E' || e.key === ' ') && nearestStation) { e.preventDefault(); openStation(nearestStation); }
+});
+window.addEventListener('keyup', e => { keysDown[e.key.toLowerCase()] = false; });
+
+const interactBtn = document.getElementById('interact-btn');
+function tryInteract() {
+  if (!nearestStation) return;
+  AudioFX.click();
+  if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+  openStation(nearestStation);
+}
+interactBtn.addEventListener('touchstart', e => { e.preventDefault(); tryInteract(); }, { passive: false });
+interactBtn.addEventListener('click', tryInteract);
+
+/* ---------- 圖例／選單（互斥開關 + 音效 + 手機返回鍵支援） ---------- */
+const legendPanel = document.getElementById('legend-panel');
+const menuPanel = document.getElementById('menu-panel');
+function closeAllPanels() {
+  legendPanel.classList.remove('show');
+  menuPanel.classList.remove('show');
+}
+function openPanel(panel) {
+  const wasOpen = panel.classList.contains('show');
+  closeAllPanels();
+  if (!wasOpen) { panel.classList.add('show'); pushBackGuard(); }
+  AudioFX.click();
+}
+document.getElementById('legend-btn').addEventListener('click', () => openPanel(legendPanel));
+document.getElementById('menu-btn').addEventListener('click', () => openPanel(menuPanel));
+document.getElementById('legend-close-btn').addEventListener('click', () => { legendPanel.classList.remove('show'); AudioFX.close(); });
+document.getElementById('menu-close-btn').addEventListener('click', () => { menuPanel.classList.remove('show'); AudioFX.close(); });
+
+/* ---------- 手機／瀏覽器「返回」鍵支援 ----------
+   原本沒有處理這件事時，在手機上開著代禱牆、圖例或選單，按下手機的
+   實體／手勢返回鍵，會直接離開整個網頁。這裡讓「返回」先關掉目前開著
+   的視窗，如果已經沒有視窗開著、又已經進了城，才把畫面帶回開頭畫面；
+   真的都關閉、也在開頭畫面時，再按一次返回鍵才會照瀏覽器原本的方式離開。 */
+let backGuardActive = false;
+function pushBackGuard() {
+  if (backGuardActive) return;
+  backGuardActive = true;
+  try { history.pushState({ swcGuard: true }, ''); } catch (e) { /* 某些環境不支援，忽略即可 */ }
+}
+window.addEventListener('popstate', () => {
+  backGuardActive = false;
+  let closedSomething = false;
+  if (!modalOverlay.classList.contains('hidden')) { closeModal(); closedSomething = true; }
+  if (legendPanel.classList.contains('show')) { legendPanel.classList.remove('show'); closedSomething = true; }
+  if (menuPanel.classList.contains('show')) { menuPanel.classList.remove('show'); closedSomething = true; }
+  if (!closedSomething && sceneInitialized && startScreen.classList.contains('hidden')) {
+    startScreen.classList.remove('hidden');
+    closedSomething = true;
+  }
+  if (closedSomething) pushBackGuard();
+});
+
+/* ---------- Toast ---------- */
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 6500);
+}
+
+/* ---------- 共享社群資料（window.storage） ---------- */
+function updateConnStatus() {
+  const el = document.getElementById('conn-status');
+  if (!el) return;
+  if (Storage.mode === 'artifact') { el.className = ''; el.textContent = ''; return; }
+  if (Storage.status.shared === 'online') {
+    el.className = 'online';
+    el.textContent = '🌐 已連上共享祈禱園，可看見所有弟兄姊妹';
+  } else if (Storage.status.shared === 'offline') {
+    el.className = 'offline';
+    el.textContent = '📴 目前連不上共享祈禱園，暫時只留在這台裝置（重新整理不會消失）';
+  } else {
+    el.className = ''; el.textContent = '';
+  }
+}
+async function loadTopStats() {
+  const el = document.getElementById('stats-corner');
+  try {
+    const c = await Storage.get('candles', true).catch(() => null);
+    const f = await Storage.get('footsteps', true).catch(() => null);
+    const w = await Storage.get('wisdomFruit', true).catch(() => null);
+    const u = await Storage.get('unityTaps', true).catch(() => null);
+    const candleCount = (c && c.value) ? (JSON.parse(c.value).count || 0) : 0;
+    const footCount = (f && f.value) ? (JSON.parse(f.value).count || 0) : 0;
+    const fruitCount = (w && w.value) ? (JSON.parse(w.value).count || 0) : 0;
+    const unityCount = (u && u.value) ? (JSON.parse(u.value).total || 0) : 0;
+    el.textContent = `🕯️ ${candleCount} 根燭光 · 👣 ${footCount} 人次同行 · 🍇 ${fruitCount} 顆智慧果實 · 🙏 ${unityCount} 次同心代求`;
+  } catch (e) {
+    el.textContent = '🕯️ 同心守望之城';
+  }
+  updateConnStatus();
+}
+async function incrementFootsteps() {
+  try {
+    const res = await Storage.get('footsteps', true);
+    let count = (res && res.value) ? (JSON.parse(res.value).count || 0) : 0;
+    count += 1;
+    await Storage.set('footsteps', JSON.stringify({ count }), true);
+  } catch (e) { /* 靜默失敗，不影響進城 */ }
+}
+async function broadcastGreeting() {
+  const btn = document.getElementById('greet-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '問安送出中…'; }
+  try {
+    const res = await Storage.get('greetings', true);
+    let list = [];
+    if (res && res.value) list = JSON.parse(res.value).list || [];
+    list.push({ name: (profile.name || '匿名肢體').slice(0, 16), color: profile.color, ts: Date.now() });
+    if (list.length > 40) list = list.slice(-40);
+    await Storage.set('greetings', JSON.stringify({ list }), true);
+    lastGreetingTs = Date.now();
+    if (btn) btn.textContent = '🙋 已舉燈問安';
+    showToast('你已舉起燈籠，向同行的肢體問安。');
+    AudioFX.greeting();
+  } catch (e) {
+    if (btn) btn.textContent = '送出失敗，請再試一次';
+    AudioFX.error();
+  }
+  if (btn) btn.disabled = false;
+}
+async function pollGreetings() {
+  try {
+    const res = await Storage.get('greetings', true);
+    if (res && res.value) {
+      const list = JSON.parse(res.value).list || [];
+      const news = list.filter(g => g.ts > lastGreetingTs && g.name !== profile.name);
+      if (news.length) {
+        const g = news[news.length - 1];
+        showToast(`🕯️ ${escapeHtml(g.name)} 舉燈問安而過，願主的平安也臨到你。`);
+        AudioFX.hint();
+      }
+      if (list.length) lastGreetingTs = Math.max(lastGreetingTs, list[list.length - 1].ts);
+    }
+  } catch (e) { /* 靜默失敗，尚無問安資料 */ }
+}
+
+async function loadCommunity(station) {
+  const key = 'station:' + station.id;
+  const statusEl = document.getElementById('community-status');
+  const wallEl = document.getElementById('wall-list');
+  let record = { visits: 0, wall: [] };
+  if (statusEl) statusEl.textContent = '載入同行肢體迴響中…';
+  try {
+    const res = await Storage.get(key, true);
+    if (res && res.value) record = JSON.parse(res.value);
+  } catch (e) { /* 尚無資料，使用預設值 */ }
+  record.visits = (record.visits || 0) + 1;
+  try { await Storage.set(key, JSON.stringify(record), true); } catch (e) { /* 靜默失敗，不影響閱讀 */ }
+  if (statusEl) statusEl.textContent = `已有 ${record.visits} 人次的肢體曾在此駐足代禱`;
+  renderWall(wallEl, record.wall);
+
+  const submitBtn = document.getElementById('wall-submit');
+  const input = document.getElementById('wall-input');
+  if (submitBtn) {
+    submitBtn.onclick = async () => {
+      const msg = (input.value || '').trim();
+      if (!msg) { showToast('請先寫下幾句話，再點「我也在此駐足代禱」。'); AudioFX.error(); return; }
+      submitBtn.disabled = true; submitBtn.textContent = '送出中…';
+      try {
+        const res2 = await Storage.get(key, true);
+        let rec2 = { visits: record.visits, wall: [] };
+        if (res2 && res2.value) rec2 = JSON.parse(res2.value);
+        rec2.wall = rec2.wall || [];
+        rec2.wall.push({ name: (profile.name || '匿名肢體').slice(0, 16), msg: msg.slice(0, 140), ts: Date.now() });
+        if (rec2.wall.length > 40) rec2.wall = rec2.wall.slice(-40);
+        await Storage.set(key, JSON.stringify(rec2), true);
+        input.value = '';
+        renderWall(wallEl, rec2.wall);
+        submitBtn.textContent = '🙏 我也在此駐足代禱';
+        AudioFX.chime();
+      } catch (e) {
+        submitBtn.textContent = '送出失敗，請再試一次';
+        AudioFX.error();
+      }
+      submitBtn.disabled = false;
+    };
+  }
+}
+function renderWall(wallEl, wall) {
+  if (!wallEl) return;
+  const recent = (wall || []).slice(-6).reverse();
+  wallEl.innerHTML = recent.length
+    ? recent.map(w => `<div class="wall-item"><strong>${escapeHtml(w.name)}</strong><span>${escapeHtml(w.msg)}</span></div>`).join('')
+    : '<p class="wall-empty">還沒有人留言，成為第一位在此駐足的肢體吧。</p>';
+}
+async function loadCandles() {
+  const el = document.getElementById('candle-count');
+  let count = 0;
+  try {
+    const res = await Storage.get('candles', true);
+    if (res && res.value) count = JSON.parse(res.value).count || 0;
+  } catch (e) { /* 尚無資料 */ }
+  if (el) el.textContent = `目前已有 ${count} 根燭光為受苦的肢體點亮`;
+}
+async function lightCandle() {
+  const btn = document.getElementById('light-candle');
+  if (btn) { btn.disabled = true; btn.textContent = '點燃中…'; }
+  try {
+    const res = await Storage.get('candles', true);
+    let count = (res && res.value) ? (JSON.parse(res.value).count || 0) : 0;
+    count += 1;
+    await Storage.set('candles', JSON.stringify({ count }), true);
+    const el = document.getElementById('candle-count');
+    if (el) el.textContent = `目前已有 ${count} 根燭光為受苦的肢體點亮`;
+    loadTopStats();
+    AudioFX.candle();
+    if (navigator.vibrate) { try { navigator.vibrate(16); } catch (e) {} }
+    if (btn) btn.textContent = '🕯️ 已為受苦的肢體點亮';
+  } catch (e) {
+    AudioFX.error();
+    if (btn) btn.textContent = '點燃失敗，請再試一次';
+  }
+  if (btn) btn.disabled = false;
+}
+
+/* ---------- 合一與守望代求 ----------
+   多台裝置之間沒有即時連線，用「一段時間窗內累積了幾次按鍵」來近似
+   「有多少人正在同心代求」：窗內達到門檻，就把金光的到期時間寫進共享
+   儲存，讓所有裝置的 pollUnityGlow() 都能看見、一起發光。 */
+async function pressUnityPrayer() {
+  const btn = document.getElementById('unity-pray-btn');
+  const statusEl = document.getElementById('unity-status');
+  if (btn) { btn.disabled = true; btn.textContent = '祈禱送出中…'; }
+  try {
+    const now = Date.now();
+    const res = await Storage.get('unityTaps', true);
+    let rec = { taps: [], total: 0 };
+    if (res && res.value) rec = JSON.parse(res.value);
+    rec.taps = (rec.taps || []).filter(ts => now - ts < UNITY_WINDOW_MS);
+    rec.taps.push(now);
+    rec.total = (rec.total || 0) + 1;
+    if (rec.taps.length > 60) rec.taps = rec.taps.slice(-60);
+    await Storage.set('unityTaps', JSON.stringify(rec), true);
+
+    if (rec.taps.length >= UNITY_THRESHOLD) {
+      const glowUntil = now + UNITY_GLOW_DURATION_MS;
+      await Storage.set('unityGlow', JSON.stringify({ until: glowUntil }), true);
+      unityGlowUntil = Math.max(unityGlowUntil, glowUntil);
+    }
+    if (btn) btn.textContent = '🙏 已同心代求';
+    if (statusEl) {
+      statusEl.textContent = Date.now() < unityGlowUntil
+        ? `🌟 最近已有 ${rec.taps.length} 位肢體同心按下祈禱鍵，碑文正發出金光——眾聖徒的祈禱如香陳列！`
+        : `最近一分鐘半內，已有 ${rec.taps.length} 位肢體按下同心代求（累計 ${rec.total} 次）。`;
+    }
+    AudioFX.chime();
+    loadTopStats();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '送出失敗，請再試一次。';
+    AudioFX.error();
+  }
+  if (btn) btn.disabled = false;
+}
+async function refreshUnityStatus() {
+  const statusEl = document.getElementById('unity-status');
+  if (!statusEl) return;
+  try {
+    const now = Date.now();
+    const res = await Storage.get('unityTaps', true);
+    let rec = { taps: [], total: 0 };
+    if (res && res.value) rec = JSON.parse(res.value);
+    const recent = (rec.taps || []).filter(ts => now - ts < UNITY_WINDOW_MS);
+    statusEl.textContent = now < unityGlowUntil
+      ? `🌟 碑文正發出金光——最近已有 ${recent.length} 位肢體同心代求。`
+      : `最近一分鐘半內，已有 ${recent.length} 位肢體按下同心代求（累計 ${rec.total || 0} 次）。點一下，加入他們。`;
+  } catch (e) {
+    statusEl.textContent = '按下「同心代求」，加入此刻的守望。';
+  }
+}
+async function pollUnityGlow() {
+  try {
+    const res = await Storage.get('unityGlow', true);
+    if (res && res.value) {
+      const until = JSON.parse(res.value).until || 0;
+      if (until > unityGlowUntil) unityGlowUntil = until;
+    }
+  } catch (e) { /* 靜默失敗，尚無金光資料 */ }
+}
+
+/* ---------- 站點內容視窗 ---------- */
+const modalOverlay = document.getElementById('modal-overlay');
+const modalCard = document.getElementById('modal-card');
+function closeModal() {
+  if (modalOverlay.classList.contains('hidden')) return;
+  modalOverlay.classList.add('hidden');
+  AudioFX.close();
+}
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+async function openStation(station) {
+  const d = station.data;
+  const zone = station.zone;
+  const versesHtml = (d.verses || []).map(v => `<blockquote>「${v.text}」<cite>——${v.ref}</cite></blockquote>`).join('');
+  const listHtml = d.items ? `<ul class="memorial-list">${d.items.map(it => `<li><strong>${escapeHtml(it.name)}</strong><span>${escapeHtml(it.note)}</span></li>`).join('')}</ul>` : '';
+  const isMemorial = d.id === 'memorial';
+  const isPavilion = d.id === 'pavilion';
+  const isAltar = d.id === 'altar';
+  const hasQuiz = Array.isArray(d.quiz) && d.quiz.length > 0;
+  const hasDialogue = !!(d.dialogue && Array.isArray(d.dialogue.scenes) && d.dialogue.scenes.length > 0);
+  const isUnity = !!d.isUnity;
+  const wallPlaceholder = isAltar
+    ? '寫下此刻放在心裡的代禱需要（會公開給一同使用此園子的肢體）'
+    : '留下你的代禱回應或默想（將公開給一同使用此禱告園的弟兄姊妹）';
+
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modal-close-btn" aria-label="關閉">×</button>
+    <span class="modal-zone-tag" style="background:${zone.glowHex};">${zone.icon} ${zone.name}</span>
+    <h2>${escapeHtml(d.title)}</h2>
+    ${d.summary ? `<p class="summary">${escapeHtml(d.summary)}</p>` : ''}
+    ${listHtml}
+    ${versesHtml}
+    ${d.reflect ? `<p class="reflect">💭 ${escapeHtml(d.reflect)}</p>` : ''}
+    ${d.prayer ? `
+      <button id="prayer-toggle" class="ghost-btn">🕯️ 讀禱告文（文字範本，不是真正的禱告）</button>
+      <div id="prayer-block" class="prayer-block hidden"><p>${escapeHtml(d.prayer)}</p></div>
+    ` : ''}
+    ${!isMemorial ? `
+      <div class="community" id="community-section">
+        <p class="community-status" id="community-status">載入同行肢體迴響中…</p>
+        <div id="wall-list" class="wall-list"></div>
+        <textarea id="wall-input" maxlength="140" placeholder="${wallPlaceholder}"></textarea>
+        <button id="wall-submit" class="primary-btn">🙏 我也在此駐足代禱</button>
+      </div>` : ''}
+    ${isPavilion ? `
+      <div style="margin-top:16px;">
+        <button id="light-candle" class="primary-btn">🕯️ 為受苦的肢體點亮一根燭光</button>
+        <p id="candle-count" class="community-status" style="margin-top:8px;"></p>
+      </div>` : ''}
+    ${isAltar ? `
+      <div style="margin-top:16px;">
+        <button id="greet-btn" class="primary-btn">🙋 舉燈問安（讓同行的肢體知道你也在這裡）</button>
+      </div>` : ''}
+    ${hasQuiz ? `
+      <div class="quiz-section" id="quiz-section">
+        <div class="quiz-progress" id="quiz-progress"></div>
+        <p class="quiz-question" id="quiz-question"></p>
+        <div class="quiz-options" id="quiz-options"></div>
+        <p class="quiz-feedback" id="quiz-feedback"></p>
+        <button id="quiz-next-btn" class="ghost-btn hidden">下一題 →</button>
+      </div>` : ''}
+    ${hasDialogue ? `
+      <div class="dialogue-section" id="dialogue-section">
+        <p class="community-status" style="margin-bottom:8px;">請選擇你想扮演的角色，開始一段栽培對話練習：</p>
+        <div id="dialogue-role-options"></div>
+      </div>` : ''}
+    ${isUnity ? `
+      <div style="margin-top:16px;">
+        <button id="unity-pray-btn" class="primary-btn">🙏 按下同心代求</button>
+        <p id="unity-status" class="community-status" style="margin-top:8px;"></p>
+      </div>` : ''}
+    <button id="modal-back-btn" class="ghost-btn" style="margin-top:16px;">← 返回地圖</button>
+  `;
+  modalOverlay.classList.remove('hidden');
+  AudioFX.open();
+  pushBackGuard();
+  document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+  document.getElementById('modal-back-btn').addEventListener('click', closeModal);
+  const toggle = document.getElementById('prayer-toggle');
+  if (toggle) toggle.addEventListener('click', () => document.getElementById('prayer-block').classList.toggle('hidden'));
+
+  if (!isMemorial) await loadCommunity(station);
+  if (isPavilion) {
+    await loadCandles();
+    document.getElementById('light-candle').addEventListener('click', lightCandle);
+  }
+  if (isAltar) {
+    document.getElementById('greet-btn').addEventListener('click', broadcastGreeting);
+  }
+  if (hasQuiz) {
+    initQuiz(d.quiz);
+  }
+  if (hasDialogue) {
+    initDialogue(d.dialogue);
+  }
+  if (isUnity) {
+    document.getElementById('unity-pray-btn').addEventListener('click', pressUnityPrayer);
+    refreshUnityStatus();
+  }
+}
+
+/* ---------- 每日研經問答（智慧果實） ---------- */
+function initQuiz(quiz) {
+  let idx = 0, correct = 0;
+  const progressEl = document.getElementById('quiz-progress');
+  const qEl = document.getElementById('quiz-question');
+  const optsEl = document.getElementById('quiz-options');
+  const fbEl = document.getElementById('quiz-feedback');
+  const nextBtn = document.getElementById('quiz-next-btn');
+  const sectionEl = document.getElementById('quiz-section');
+
+  function renderQuestion() {
+    const item = quiz[idx];
+    progressEl.textContent = `📖 研經問答．第 ${idx + 1} / ${quiz.length} 題`;
+    qEl.textContent = item.q;
+    fbEl.textContent = '';
+    nextBtn.classList.add('hidden');
+    optsEl.innerHTML = '';
+    item.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'quiz-opt-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => selectAnswer(i));
+      optsEl.appendChild(btn);
+    });
+  }
+
+  function selectAnswer(i) {
+    const item = quiz[idx];
+    const btns = optsEl.querySelectorAll('.quiz-opt-btn');
+    btns.forEach(b => { b.disabled = true; });
+    if (i === item.answer) {
+      btns[i].classList.add('correct');
+      correct++;
+      AudioFX.chime();
+    } else {
+      btns[i].classList.add('wrong');
+      btns[item.answer].classList.add('correct');
+      AudioFX.error();
+    }
+    fbEl.textContent = item.explain || '';
+    nextBtn.classList.remove('hidden');
+    nextBtn.textContent = (idx < quiz.length - 1) ? '下一題 →' : '完成，領取智慧果實 →';
+  }
+
+  nextBtn.addEventListener('click', async () => {
+    idx++;
+    if (idx < quiz.length) {
+      renderQuestion();
+    } else {
+      progressEl.textContent = '';
+      qEl.textContent = '';
+      optsEl.innerHTML = '';
+      fbEl.textContent = '';
+      nextBtn.classList.add('hidden');
+      const resultEl = document.createElement('div');
+      resultEl.className = 'quiz-result';
+      resultEl.textContent = correct > 0
+        ? `🍇 本輪答對 ${correct} / ${quiz.length} 題，已為主內公共營地結出 ${correct} 顆智慧果實！`
+        : `本輪答對 ${correct} / ${quiz.length} 題，願神的話語繼續光照我們——歡迎再讀一次經文後重新挑戰。`;
+      sectionEl.appendChild(resultEl);
+      if (correct > 0) await awardWisdomFruit(correct);
+    }
+  });
+
+  renderQuestion();
+}
+async function awardWisdomFruit(n) {
+  try {
+    const res = await Storage.get('wisdomFruit', true);
+    let count = (res && res.value) ? (JSON.parse(res.value).count || 0) : 0;
+    count += n;
+    await Storage.set('wisdomFruit', JSON.stringify({ count }), true);
+    loadTopStats();
+  } catch (e) { /* 靜默失敗，不影響作答體驗 */ }
+}
+
+/* ---------- 主日學與受浸班預備．慕道友栽培對話模擬 ---------- */
+function initDialogue(dlg) {
+  const section = document.getElementById('dialogue-section');
+  const roleOptsEl = document.getElementById('dialogue-role-options');
+  dlg.roles.forEach(role => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dialogue-role-btn';
+    btn.innerHTML = `<strong>${escapeHtml(role.label)}</strong><span>${escapeHtml(role.desc)}</span>`;
+    btn.addEventListener('click', () => startDialogue(role.id));
+    roleOptsEl.appendChild(btn);
+  });
+
+  function startDialogue(roleId) {
+    let idx = 0;
+    section.innerHTML = '<p class="community-status" id="dlg-progress"></p>' +
+      '<div class="dialogue-npc-line" id="dlg-npc-line"></div>' +
+      '<div class="quiz-options" id="dlg-options"></div>' +
+      '<p class="quiz-feedback" id="dlg-feedback"></p>' +
+      '<button id="dlg-next-btn" class="ghost-btn hidden">下一幕 →</button>';
+    renderScene();
+
+    function renderScene() {
+      const scene = dlg.scenes[idx];
+      const branch = roleId === 'seeker' ? scene.whenSeeker : scene.whenDiscipler;
+      const progressEl = document.getElementById('dlg-progress');
+      const npcEl = document.getElementById('dlg-npc-line');
+      const optsEl = document.getElementById('dlg-options');
+      const fbEl = document.getElementById('dlg-feedback');
+      const nextBtn = document.getElementById('dlg-next-btn');
+      progressEl.textContent = `💬 栽培對話（${roleId === 'seeker' ? '扮演：慕道友' : '扮演：栽培員'}）．第 ${idx + 1} / ${dlg.scenes.length} 幕`;
+      npcEl.textContent = branch.npcLine;
+      fbEl.textContent = '';
+      nextBtn.classList.add('hidden');
+      nextBtn.textContent = (idx < dlg.scenes.length - 1) ? '下一幕 →' : '完成這次栽培對話 →';
+      optsEl.innerHTML = '';
+      branch.options.forEach(opt => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'quiz-opt-btn';
+        b.textContent = opt.text;
+        b.addEventListener('click', () => {
+          optsEl.querySelectorAll('.quiz-opt-btn').forEach(x => { x.disabled = true; });
+          b.classList.add('chosen');
+          fbEl.textContent = opt.feedback || '';
+          nextBtn.classList.remove('hidden');
+          AudioFX.chime();
+        });
+        optsEl.appendChild(b);
+      });
+      nextBtn.onclick = () => {
+        idx++;
+        if (idx < dlg.scenes.length) {
+          renderScene();
+        } else {
+          section.innerHTML = `<div class="quiz-result">🕊️ 你已完成一次「${roleId === 'seeker' ? '慕道友' : '栽培員'}」的栽培對話練習。願這份預備幫助你在受浸主日，向教會與世界誠實見證你在基督裡的信心。</div>`;
+        }
+      };
+    }
+  }
+}
+
+/* ---------- 開場：暱稱與燈籠顏色 ---------- */
+const startScreen = document.getElementById('start-screen');
+const nameInput = document.getElementById('name-input');
+let selectedColor = '#E8A33D';
+document.querySelectorAll('.avatar-swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.avatar-swatch').forEach(s => s.classList.remove('selected'));
+    sw.classList.add('selected');
+    selectedColor = sw.dataset.color;
+  });
+});
+document.getElementById('enter-btn').addEventListener('click', async () => {
+  AudioFX.unlock();
+  profile.name = (nameInput.value || '').trim() || '匿名肢體';
+  profile.color = selectedColor;
+  lastGreetingTs = Date.now();
+  try { await Storage.set('profile', JSON.stringify(profile), false); } catch (e) { /* 忽略儲存失敗 */ }
+  startScreen.classList.add('hidden');
+  if (!sceneInitialized) {
+    sceneInitialized = true;
+    await incrementFootsteps();
+    initScene();
+  } else {
+    updatePlayerAppearance();
+  }
+  AudioFX.chime();
+});
+function updatePlayerAppearance() {
+  if (!player) return;
+  const robe = player.children.find(c => c.geometry && c.geometry.type === 'ConeGeometry');
+  if (robe) robe.material.color.set(profile.color);
+  const oldTag = player.children.find(c => c.isSprite);
+  if (oldTag) { player.remove(oldTag); oldTag.material.map.dispose(); oldTag.material.dispose(); }
+  const nameTag = makeTextSprite(profile.name || '匿名肢體', profile.color, 24);
+  nameTag.position.y = 2.55;
+  player.add(nameTag);
+}
+
+/* ---------- 選單：音效開關／說明／返回開頭畫面 ---------- */
+const soundToggleBtn = document.getElementById('sound-toggle-btn');
+function refreshSoundLabel() { soundToggleBtn.textContent = AudioFX.isEnabled() ? '🔊 音效：開' : '🔇 音效：關'; }
+refreshSoundLabel();
+soundToggleBtn.addEventListener('click', () => {
+  AudioFX.setEnabled(!AudioFX.isEnabled());
+  refreshSoundLabel();
+  AudioFX.click();
+});
+document.getElementById('help-btn').addEventListener('click', () => {
+  closeAllPanels();
+  AudioFX.open();
+  pushBackGuard();
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modal-close-btn" aria-label="關閉">×</button>
+    <h2>🕯️ 關於這座禱告園</h2>
+    <p class="summary">這是一座以「2026年9月20日：世界、基督教界、中國大陸與中國大陸家庭教會」的大事與紀念所築成的3D禱告園，東北方的「華夏守望葡萄園」另外收納了每日研經站、主日學與受浸班預備、合一與守望代求三個練習與代求功能。</p>
+    <p class="summary">拖曳畫面任何地方即可行走（不用精準摸到左下角那顆搖桿），靠近發光的站點後點擊右下角「互動」即可閱讀、代禱與留言。研經站可作答問答領取智慧果實；受浸班預備可選擇扮演「栽培員」或「慕道友」，透過對話操練基要真理；合一守望代求則可在經文碑前按下祈禱鍵，當夠多肢體在相近時間同心代求，碑文便會發出金光。留言、燭光、問安與代求會即時共享給所有打開這個網址的弟兄姊妹（資料存在雲端伺服器上，不分裝置）；只有你自己的暱稱與燈籠顏色，會留在這一台裝置裡。</p>
+    <p class="summary">園中的代禱文字只是範本，不是真正的禱告。真正的平安來自耶穌（約14:27）。</p>
+    <button id="modal-back-btn" class="ghost-btn" style="margin-top:16px;">← 返回地圖</button>
+  `;
+  modalOverlay.classList.remove('hidden');
+  document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+  document.getElementById('modal-back-btn').addEventListener('click', closeModal);
+});
+document.getElementById('backstart-btn').addEventListener('click', () => {
+  closeAllPanels();
+  AudioFX.click();
+  keysDown && Object.keys(keysDown).forEach(k => { keysDown[k] = false; });
+  stickUp();
+  if (sceneInitialized) startScreen.classList.remove('hidden');
+});
+(async function prefill() {
+  try {
+    const res = await Storage.get('profile', false);
+    if (res && res.value) {
+      const saved = JSON.parse(res.value);
+      if (saved.name) nameInput.value = saved.name;
+      if (saved.color) {
+        selectedColor = saved.color;
+        document.querySelectorAll('.avatar-swatch').forEach(s => {
+          s.classList.toggle('selected', s.dataset.color === saved.color);
+        });
+      }
+    }
+  } catch (e) { /* 尚無先前的暱稱資料 */ }
+})();
+</script>
+</body>
+</html>
