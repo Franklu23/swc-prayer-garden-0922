@@ -1,0 +1,6 @@
+# 同心守望之城．Netlify 部署設定
+# publish：靜態網頁（禱告園本體）所在的資料夾
+# functions：Netlify Functions（讀寫 Netlify Blobs 的後端 API）所在的資料夾
+[build]
+  publish = "public"
+  functions = "netlify/functions"

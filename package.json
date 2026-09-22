@@ -1,0 +1,9 @@
+{
+  "name": "swc-prayer-garden",
+  "private": true,
+  "version": "1.0.0",
+  "description": "同心守望之城．3D多人代禱園",
+  "dependencies": {
+    "@netlify/blobs": "^11.0.3"
+  }
+}
